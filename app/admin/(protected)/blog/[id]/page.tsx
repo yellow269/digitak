@@ -5,9 +5,10 @@ import type { BlogPost } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EditBlogPage({ params }: { params: { id: string } }) {
+export default async function EditBlogPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase.from('blog_posts').select('*').eq('id', params.id).maybeSingle();
+  const { data } = await supabase.from('blog_posts').select('*').eq('id', id).maybeSingle();
   const post = data as BlogPost | null;
   if (!post) notFound();
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Search, ArrowLeft, PackageSearch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,10 +23,10 @@ export function SearchBrowser({ initialProducts, query }: { initialProducts: Pro
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <Button asChild variant="ghost" size="sm" className="mb-2 gap-1">
-        <a href="/">
+        <Link href="/">
           <ArrowLeft className="h-4 w-4" />
           Home
-        </a>
+        </Link>
       </Button>
       <h1 className="text-3xl font-bold text-slate-900">Search</h1>
       <p className="text-slate-500">Find digital products across our entire catalogue</p>
@@ -66,7 +67,7 @@ export function SearchBrowser({ initialProducts, query }: { initialProducts: Pro
           <p className="mt-4 text-lg font-medium text-slate-600">No results found</p>
           <p className="text-sm text-slate-500">Try a different keyword or browse all products.</p>
           <Button asChild className="mt-4" variant="outline">
-            <a href="/products">Browse all products</a>
+            <Link href="/products">Browse all products</Link>
           </Button>
         </div>
       )}

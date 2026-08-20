@@ -31,13 +31,14 @@ function validateAffiliateUrl(urlStr: string): URL | null {
   }
 }
 
-export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
   const supabase = createPublicSupabaseClient();
 
   const { data: product, error } = await supabase
     .from('products')
     .select('id, affiliate_url, status')
-    .eq('slug', params.slug)
+    .eq('slug', slug)
     .maybeSingle();
 
   if (error) {
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   else if (/tablet|ipad/i.test(ua)) deviceType = 'tablet';
 
   const referrer = req.headers.get('referer') || null;
-  const landingPage = req.headers.get('x-forwarded-uri') || `/go/${params.slug}`;
+  const landingPage = req.headers.get('x-forwarded-uri') || `/go/${slug}`;
 
   // Record the click (fire-and-forget — log errors but don't block redirect)
   const { error: clickError } = await supabase.from('affiliate_clicks').insert({

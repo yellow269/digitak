@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { SlidersHorizontal, Search, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -172,7 +173,7 @@ export function ProductsBrowser({
               <p className="text-lg font-medium text-slate-600">No products found</p>
               <p className="text-sm text-slate-500">Try adjusting your filters or search terms.</p>
               <Button asChild className="mt-4" variant="outline">
-                <a href="/products">Clear filters</a>
+                <Link href="/products">Clear filters</Link>
               </Button>
             </div>
           ) : (

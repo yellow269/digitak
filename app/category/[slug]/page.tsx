@@ -20,8 +20,9 @@ async function getCategory(slug: string): Promise<Category | null> {
   return data as Category | null;
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const category = await getCategory(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const category = await getCategory(slug);
   if (!category) return { title: 'Category not found' };
   const title = category.seo_title || `${category.name} | DigitalVault SA`;
   const description = category.seo_description || category.description || '';
@@ -33,8 +34,9 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function CategoryPage({ params }: { params: { slug: string } }) {
-  const category = await getCategory(params.slug);
+export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const category = await getCategory(slug);
   if (!category) notFound();
 
   const supabase = createPublicSupabaseClient();

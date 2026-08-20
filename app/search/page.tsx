@@ -13,9 +13,9 @@ function sanitizeSearchInput(input: string): string {
   return clean;
 }
 
-export default async function SearchPage({ searchParams }: { searchParams: { q?: string } }) {
-  const rawQ = searchParams.q || '';
-  const q = sanitizeSearchInput(rawQ);
+export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const { q: rawQ } = await searchParams;
+  const q = sanitizeSearchInput(rawQ || '');
   let products: Product[] = [];
 
   if (q && q.length >= 1) {
@@ -36,7 +36,7 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
 
   return (
     <Suspense fallback={<div className="container mx-auto max-w-7xl px-4 py-8">Loading...</div>}>
-      <SearchBrowser initialProducts={products} query={rawQ} />
+      <SearchBrowser initialProducts={products} query={rawQ || ''} />
     </Suspense>
   );
 }
