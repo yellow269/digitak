@@ -2,6 +2,9 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
+const VALID_BROWSER_KEY_RE = /^(eyJ|sb_publishable_)/;
+const SECRET_KEY_RE = /^sb_secret_/;
+
 function validateAnonKey(context: string) {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) {
@@ -10,11 +13,18 @@ function validateAnonKey(context: string) {
       'Add it to your Vercel environment variables.'
     );
   }
-  if (key.startsWith('sb_secret_')) {
+  if (SECRET_KEY_RE.test(key)) {
     throw new Error(
       `[DigiTak] ${context}: NEXT_PUBLIC_SUPABASE_ANON_KEY contains a ` +
-      'service-role key (sb_secret_...). Set it to your anon key (eyJhbG...) ' +
-      'in Vercel → Project Settings → Environment Variables.'
+      'service-role key (sb_secret_...). Set it to your publishable key ' +
+      '(sb_publishable_...) or anon key (eyJhbG...) in Vercel.'
+    );
+  }
+  if (!VALID_BROWSER_KEY_RE.test(key)) {
+    throw new Error(
+      `[DigiTak] ${context}: NEXT_PUBLIC_SUPABASE_ANON_KEY does not look ` +
+      'like a valid public key. Expected "eyJ" or "sb_publishable_" prefix. ' +
+      'Current value starts with: "' + key.substring(0, 10) + '..."'
     );
   }
 }
