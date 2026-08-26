@@ -27,7 +27,7 @@ export default function AdminError({
       <div className="mt-6 flex gap-3">
         <Button onClick={reset}>Try again</Button>
         <Button asChild variant="outline">
-          <Link href="/admin">Back to dashboard</Link>
+          <Link href="/admin/dashboard">Back to dashboard</Link>
         </Button>
       </div>
     </div>

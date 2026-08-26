@@ -28,7 +28,7 @@ export default function AdminLoginPage() {
       setLoading(false);
       return;
     }
-    router.push('/admin');
+    router.push('/admin/dashboard');
     router.refresh();
   }
 
