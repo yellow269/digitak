@@ -2,7 +2,24 @@ import { createServerClient } from '@supabase/ssr';
 import type { CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+function validateAnonKey() {
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!key) {
+    throw new Error(
+      '[DigiTak] middleware: NEXT_PUBLIC_SUPABASE_ANON_KEY is not set.'
+    );
+  }
+  if (key.startsWith('sb_secret_')) {
+    throw new Error(
+      '[DigiTak] middleware: NEXT_PUBLIC_SUPABASE_ANON_KEY contains a ' +
+      'service-role key. Set it to your anon key (eyJhbG...) in Vercel.'
+    );
+  }
+}
+
 export async function middleware(request: NextRequest) {
+  validateAnonKey();
+
   let response = NextResponse.next({
     request: { headers: request.headers },
   });

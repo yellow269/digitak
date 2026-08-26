@@ -2,12 +2,30 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
+function validateAnonKey(context: string) {
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!key) {
+    throw new Error(
+      `[DigiTak] ${context}: NEXT_PUBLIC_SUPABASE_ANON_KEY is not set. ` +
+      'Add it to your Vercel environment variables.'
+    );
+  }
+  if (key.startsWith('sb_secret_')) {
+    throw new Error(
+      `[DigiTak] ${context}: NEXT_PUBLIC_SUPABASE_ANON_KEY contains a ` +
+      'service-role key (sb_secret_...). Set it to your anon key (eyJhbG...) ' +
+      'in Vercel → Project Settings → Environment Variables.'
+    );
+  }
+}
+
 /**
  * Server Supabase client WITH cookie access.
  * Use ONLY in Route Handlers, Server Actions, and pages that have request context.
  * Do NOT use in static generation or ISR pages — those lack request context.
  */
 export async function createServerSupabaseClient() {
+  validateAnonKey('createServerSupabaseClient');
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -38,6 +56,7 @@ export async function createServerSupabaseClient() {
  * Uses only the anon key — respects RLS but without user session.
  */
 export function createPublicSupabaseClient() {
+  validateAnonKey('createPublicSupabaseClient');
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
