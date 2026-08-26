@@ -4,6 +4,7 @@ import { Star, ExternalLink, Tag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { CopyLinkButton } from '@/components/copy-link-button';
 import { formatPrice } from '@/lib/format';
 import type { Product } from '@/lib/types';
 
@@ -66,13 +67,14 @@ export function ProductCard({ product }: { product: Product }) {
         </div>
       </CardContent>
 
-      <CardFooter className="p-4 pt-0">
-        <Button asChild className="w-full">
+      <CardFooter className="flex gap-2 p-4 pt-0">
+        <Button asChild className="flex-1">
           <Link href={`/go/${product.slug}`}>
-            View Offer
+            Get Deal
             <ExternalLink className="ml-1 h-3.5 w-3.5" />
           </Link>
         </Button>
+        <CopyLinkButton slug={product.slug} size="icon" className="shrink-0" />
       </CardFooter>
     </Card>
   );

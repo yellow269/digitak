@@ -355,7 +355,7 @@ export function ProductForm({
               placeholder="https://www.digistore24.com/..."
             />
             <p className="mt-1 text-xs text-slate-500">
-              This is where the &quot;View Offer&quot; button will redirect visitors.
+              This is where the &quot;Get Deal&quot; button will redirect visitors.
             </p>
           </div>
           <div>

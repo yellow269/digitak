@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { AffiliateBadge } from '@/components/affiliate-badge';
+import { CopyLinkButton } from '@/components/copy-link-button';
 import { createPublicSupabaseClient } from '@/lib/supabase/server';
 import { PUBLIC_PRODUCT_COLUMNS } from '@/lib/queries';
 import { formatPrice } from '@/lib/format';
@@ -189,12 +190,15 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
           {/* CTA */}
           <div className="mt-6 flex flex-col gap-3">
-            <Button asChild size="lg" className="gap-2 text-base">
-              <Link href={`/go/${product.slug}`}>
-                View Offer
-                <ExternalLink className="h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button asChild size="lg" className="flex-1 gap-2 text-base">
+                <Link href={`/go/${product.slug}`}>
+                  Get Deal
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
+              </Button>
+              <CopyLinkButton slug={product.slug} size="lg" className="shrink-0" />
+            </div>
             <p className="text-xs text-slate-500">
               You will be redirected to the vendor&apos;s page. {AFFILIATE_DISCLOSURE_SHORT}
             </p>
