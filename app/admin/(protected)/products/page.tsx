@@ -9,6 +9,13 @@ import type { Product } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
+const TYPE_BADGES: Record<string, string> = {
+  affiliate: 'bg-blue-100 text-blue-800',
+  dropshipping: 'bg-green-100 text-green-800',
+  digital: 'bg-purple-100 text-purple-800',
+  manual: 'bg-orange-100 text-orange-800',
+};
+
 export default async function AdminProductsPage() {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
@@ -52,6 +59,7 @@ export default async function AdminProductsPage() {
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Category</th>
                 <th className="px-4 py-3">Price</th>
                 <th className="px-4 py-3">Status</th>
@@ -68,8 +76,13 @@ export default async function AdminProductsPage() {
                       <span className="font-medium text-slate-900">{p.name}</span>
                     </div>
                   </td>
+                  <td className="px-4 py-3">
+                    <Badge className={TYPE_BADGES[p.product_type || 'affiliate'] || ''}>
+                      {p.product_type || 'affiliate'}
+                    </Badge>
+                  </td>
                   <td className="px-4 py-3 text-slate-600">{p.category?.name || '—'}</td>
-                  <td className="px-4 py-3 text-slate-600">{formatPrice(p.price, p.currency)}</td>
+                  <td className="px-4 py-3 text-slate-600">{formatPrice(p.selling_price || p.price, p.currency)}</td>
                   <td className="px-4 py-3">
                     <Badge variant={p.status === 'published' ? 'default' : 'secondary'}>
                       {p.status}

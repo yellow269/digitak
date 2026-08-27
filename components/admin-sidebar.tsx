@@ -15,6 +15,11 @@ import {
   Menu,
   X,
   ExternalLink,
+  Truck,
+  ShoppingCart,
+  DollarSign,
+  Store,
+  Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
@@ -23,11 +28,18 @@ import { cn } from '@/lib/utils';
 const NAV_ITEMS = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Products', icon: Package },
+  { href: '/admin/suppliers', label: 'Suppliers', icon: Truck },
+  { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
+  { href: '/admin/customers', label: 'Customers', icon: Users },
+  { href: '/admin/profit', label: 'Profit', icon: DollarSign },
+  { href: '/admin/marketplace', label: 'Marketplace', icon: Store },
+  { divider: true },
   { href: '/admin/blog', label: 'Blog', icon: FileText },
   { href: '/admin/categories', label: 'Categories', icon: FolderTree },
   { href: '/admin/messages', label: 'Messages', icon: Mail },
   { href: '/admin/subscribers', label: 'Subscribers', icon: Users },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
 export function AdminSidebar({ email }: { email: string }) {
@@ -75,23 +87,29 @@ export function AdminSidebar({ email }: { email: string }) {
             <p className="truncate text-sm font-medium text-white">{email}</p>
           </div>
 
-          <nav className="flex-1 space-y-1 px-3">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive(item.href)
-                    ? 'bg-sky-600 text-white'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            ))}
+          <nav className="flex-1 space-y-1 px-3 overflow-y-auto">
+            {NAV_ITEMS.map((item, i) => {
+              if ('divider' in item && item.divider) {
+                return <div key={`div-${i}`} className="my-2 border-t border-slate-800" />;
+              }
+              const navItem = item as { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
+              return (
+                <Link
+                  key={navItem.href}
+                  href={navItem.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    isActive(navItem.href)
+                      ? 'bg-sky-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  )}
+                >
+                  <navItem.icon className="h-4 w-4" />
+                  {navItem.label}
+                </Link>
+              );
+            })}
           </nav>
 
           <div className="space-y-2 border-t border-slate-800 p-3">

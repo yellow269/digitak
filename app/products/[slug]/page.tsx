@@ -2,17 +2,16 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { Star, ExternalLink, ShieldCheck, CheckCircle2, ArrowLeft, Link2 } from 'lucide-react';
+import { Star, ShieldCheck, CheckCircle2, ArrowLeft, Link2, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { AffiliateBadge } from '@/components/affiliate-badge';
-import { CopyLinkButton } from '@/components/copy-link-button';
 import { createPublicSupabaseClient } from '@/lib/supabase/server';
 import { PUBLIC_PRODUCT_COLUMNS } from '@/lib/queries';
 import { formatPrice } from '@/lib/format';
 import { AFFILIATE_DISCLOSURE_SHORT, SITE_NAME } from '@/lib/constants';
-import type { Product, Category } from '@/lib/types';
+import type { Product } from '@/lib/types';
+import { AddToCartButton } from '@/components/add-to-cart-button';
 
 export const revalidate = 3600;
 
@@ -29,6 +28,19 @@ async function getProduct(slug: string): Promise<Product | null> {
     return null;
   }
   return data as Product | null;
+}
+
+async function getRelatedProducts(categoryId: string | null, currentId: string): Promise<Product[]> {
+  if (!categoryId) return [];
+  const supabase = createPublicSupabaseClient();
+  const { data } = await supabase
+    .from('products')
+    .select(PUBLIC_PRODUCT_COLUMNS)
+    .eq('status', 'published')
+    .eq('category_id', categoryId)
+    .neq('id', currentId)
+    .limit(4);
+  return (data as unknown as Product[]) || [];
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -63,8 +75,12 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const product = await getProduct(slug);
   if (!product) notFound();
 
-  const isDemo = product.name.startsWith('[Demo]');
   const benefits: string[] = Array.isArray(product.benefits) ? product.benefits : [];
+  const isAffiliate = product.product_type === 'affiliate';
+  const isDropshipping = product.product_type === 'dropshipping';
+  const displayPrice = product.selling_price || product.price;
+  const isOnSale = product.sale_price && product.sale_price < (product.price || 0);
+  const relatedProducts = await getRelatedProducts(product.category?.id || null, product.id);
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -81,12 +97,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             reviewCount: product.review_count,
           }
         : undefined,
-    offers: product.price
+    offers: displayPrice
       ? {
           '@type': 'Offer',
-          price: product.price,
-          priceCurrency: product.currency,
-          availability: 'https://schema.org/InStock',
+          price: isOnSale ? product.sale_price : displayPrice,
+          priceCurrency: product.currency || 'ZAR',
+          availability: product.stock_status === 'out_of_stock'
+            ? 'https://schema.org/OutOfStock'
+            : 'https://schema.org/InStock',
         }
       : undefined,
   };
@@ -129,8 +147,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               <Link2 className="h-16 w-16" />
             </div>
           )}
-          {isDemo && (
-            <Badge variant="secondary" className="absolute right-3 top-3">Demo product</Badge>
+          {product.featured && (
+            <Badge className="absolute left-3 top-3 bg-amber-500 hover:bg-amber-500">Featured</Badge>
+          )}
+          {isOnSale && (
+            <Badge className="absolute right-3 top-3 bg-red-500 hover:bg-red-500">Sale</Badge>
           )}
         </div>
 
@@ -169,11 +190,33 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           )}
 
           {/* Price */}
-          <div className="mt-4">
+          <div className="mt-4 flex items-baseline gap-3">
+            {isOnSale && (
+              <span className="text-lg text-slate-400 line-through">
+                {formatPrice(product.price, product.currency || 'ZAR')}
+              </span>
+            )}
             <span className="text-3xl font-bold text-slate-900">
-              {formatPrice(product.price, product.currency)}
+              {formatPrice(isOnSale ? (product.sale_price ?? null) : (displayPrice ?? null), product.currency || 'ZAR')}
             </span>
-            <span className="ml-2 text-sm text-slate-500">{product.currency}</span>
+          </div>
+
+          {/* Stock & Shipping */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge variant={product.stock_status === 'out_of_stock' ? 'destructive' : 'secondary'}>
+              {product.stock_status === 'out_of_stock' ? 'Out of Stock' : 'In Stock'}
+            </Badge>
+            {product.shipping_estimate && (
+              <Badge variant="outline" className="gap-1">
+                <Truck className="h-3 w-3" />
+                {product.shipping_estimate}
+              </Badge>
+            )}
+            {isDropshipping && (
+              <Badge variant="outline" className="gap-1 text-green-700 border-green-200 bg-green-50">
+                Delivered directly to your door
+              </Badge>
+            )}
           </div>
 
           {/* Vendor */}
@@ -184,24 +227,22 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           )}
 
           {/* Affiliate disclosure */}
-          <div className="mt-4">
-            <AffiliateBadge />
-          </div>
+          {isAffiliate && (
+            <div className="mt-4">
+              <Badge variant="secondary" className="gap-1 text-amber-700 bg-amber-50">
+                Affiliate Link
+              </Badge>
+            </div>
+          )}
 
           {/* CTA */}
           <div className="mt-6 flex flex-col gap-3">
-            <div className="flex gap-2">
-              <Button asChild size="lg" className="flex-1 gap-2 text-base">
-                <Link href={`/go/${product.slug}`}>
-                  Get Deal
-                  <ExternalLink className="h-4 w-4" />
-                </Link>
-              </Button>
-              <CopyLinkButton slug={product.slug} size="lg" className="shrink-0" />
-            </div>
-            <p className="text-xs text-slate-500">
-              You will be redirected to the vendor&apos;s page. {AFFILIATE_DISCLOSURE_SHORT}
-            </p>
+            <AddToCartButton product={product} isAffiliate={isAffiliate} />
+            {isAffiliate && (
+              <p className="text-xs text-slate-500">
+                You will be redirected to the vendor&apos;s page. {AFFILIATE_DISCLOSURE_SHORT}
+              </p>
+            )}
           </div>
 
           {/* Benefits */}
@@ -232,18 +273,52 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       )}
 
       {/* Affiliate disclosure box */}
-      <Card className="mt-12 border-amber-200 bg-amber-50">
-        <CardContent className="flex items-start gap-3 p-6">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-          <div>
-            <h3 className="font-semibold text-amber-900">Affiliate Disclosure</h3>
-            <p className="mt-1 text-sm text-amber-800">{AFFILIATE_DISCLOSURE_SHORT}</p>
-            <Link href="/affiliate-disclosure" className="mt-2 inline-block text-sm font-medium text-amber-900 underline">
-              Read full disclosure
-            </Link>
+      {isAffiliate && (
+        <Card className="mt-12 border-amber-200 bg-amber-50">
+          <CardContent className="flex items-start gap-3 p-6">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div>
+              <h3 className="font-semibold text-amber-900">Affiliate Disclosure</h3>
+              <p className="mt-1 text-sm text-amber-800">{AFFILIATE_DISCLOSURE_SHORT}</p>
+              <Link href="/affiliate-disclosure" className="mt-2 inline-block text-sm font-medium text-amber-900 underline">
+                Read full disclosure
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Related Products */}
+      {relatedProducts.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-slate-900 mb-6">Related Products</h2>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {relatedProducts.map((p) => (
+              <div key={p.id}>
+                <Link href={`/products/${p.slug}`}>
+                  <Card className="overflow-hidden transition-all hover:shadow-lg">
+                    <div className="relative aspect-[4/3] bg-slate-100">
+                      {p.image_url ? (
+                        <Image src={p.image_url} alt={p.name} fill sizes="25vw" className="object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-slate-400">
+                          <Link2 className="h-8 w-8" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <h3 className="font-medium text-slate-900 line-clamp-1 hover:text-sky-700">{p.name}</h3>
+                      <p className="text-sm font-bold text-slate-900 mt-1">
+                        {formatPrice(p.selling_price || p.price, p.currency || 'ZAR')}
+                      </p>
+                    </div>
+                  </Card>
+                </Link>
+              </div>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
       <div className="mt-8">
         <Button asChild variant="ghost" className="gap-1">

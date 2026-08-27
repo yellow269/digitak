@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { Package, MousePointerClick, TrendingUp, FileText, ArrowRight, Eye } from 'lucide-react';
+import { Package, MousePointerClick, TrendingUp, FileText, ArrowRight, Eye, ShoppingCart, DollarSign, Truck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatPrice } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,56 +15,40 @@ export default async function AdminDashboard() {
     productsRes,
     activeProductsRes,
     clicksRes,
-    clicksTodayRes,
-    clicksMonthRes,
-    topProductsRes,
+    ordersRes,
+    paidOrdersRes,
+    revenueRes,
     recentMessagesRes,
   ] = await Promise.all([
     supabase.from('products').select('id', { count: 'exact', head: true }),
     supabase.from('products').select('id', { count: 'exact', head: true }).eq('status', 'published'),
     supabase.from('affiliate_clicks').select('id', { count: 'exact', head: true }),
-    supabase
-      .from('affiliate_clicks')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
-    supabase
-      .from('affiliate_clicks')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', new Date(new Date(new Date().getFullYear(), new Date().getMonth(), 1)).toISOString()),
-    supabase
-      .from('affiliate_clicks')
-      .select('product_id, products!inner(name, slug)')
-      .limit(500),
+    supabase.from('orders').select('id', { count: 'exact', head: true }),
+    supabase.from('orders').select('*').eq('payment_status', 'paid').order('created_at', { ascending: false }).limit(5),
+    supabase.from('orders').select('total, payment_fee').eq('payment_status', 'paid'),
     supabase.from('contact_messages').select('*').order('created_at', { ascending: false }).limit(5),
   ]);
 
-  const clickRows = (topProductsRes.data as unknown as { product_id: string; products: { name: string; slug: string } }[]) || [];
-  const productCounts: Record<string, { name: string; slug: string; count: number }> = {};
-  clickRows.forEach((row) => {
-    if (!row.product_id) return;
-    const key = row.product_id;
-    if (!productCounts[key]) {
-      productCounts[key] = { name: row.products?.name || 'Unknown', slug: row.products?.slug || '', count: 0 };
-    }
-    productCounts[key].count++;
-  });
-  const topProducts = Object.values(productCounts).sort((a, b) => b.count - a.count).slice(0, 5);
+  const totalRevenue = (revenueRes.data || []).reduce((sum: number, o: any) => sum + (o.total || 0), 0);
+  const totalFees = (revenueRes.data || []).reduce((sum: number, o: any) => sum + (o.payment_fee || 0), 0);
 
   const stats = [
     { label: 'Total Products', value: productsRes.count || 0, icon: Package, color: 'text-sky-600 bg-sky-100' },
-    { label: 'Active Products', value: activeProductsRes.count || 0, icon: Eye, color: 'text-green-600 bg-green-100' },
-    { label: 'Total Clicks', value: clicksRes.count || 0, icon: MousePointerClick, color: 'text-amber-600 bg-amber-100' },
-    { label: 'Clicks Today', value: clicksTodayRes.count || 0, icon: TrendingUp, color: 'text-purple-600 bg-purple-100' },
+    { label: 'Published', value: activeProductsRes.count || 0, icon: Eye, color: 'text-green-600 bg-green-100' },
+    { label: 'Total Orders', value: ordersRes.count || 0, icon: ShoppingCart, color: 'text-purple-600 bg-purple-100' },
+    { label: 'Revenue', value: formatPrice(totalRevenue, 'ZAR'), icon: DollarSign, color: 'text-amber-600 bg-amber-100' },
+    { label: 'Affiliate Clicks', value: clicksRes.count || 0, icon: MousePointerClick, color: 'text-blue-600 bg-blue-100' },
+    { label: 'Payment Fees', value: formatPrice(totalFees, 'ZAR'), icon: TrendingUp, color: 'text-red-600 bg-red-100' },
   ];
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-500">Overview of your storefront</p>
+        <p className="text-sm text-slate-500">Overview of your Everything Store</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((stat) => (
           <Card key={stat.label}>
             <CardContent className="flex items-center gap-4 p-5">
@@ -81,31 +65,31 @@ export default async function AdminDashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        {/* Recent Paid Orders */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              Top Products by Clicks
-              <Link href="/admin/analytics" className="text-sm font-normal text-sky-600 hover:text-sky-700">
-                View analytics
+              Recent Orders
+              <Link href="/admin/orders" className="text-sm font-normal text-sky-600 hover:text-sky-700">
+                View all
               </Link>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {topProducts.length === 0 ? (
-              <p className="text-sm text-slate-500">No clicks recorded yet.</p>
+            {(!paidOrdersRes.data || paidOrdersRes.data.length === 0) ? (
+              <p className="text-sm text-slate-500">No paid orders yet.</p>
             ) : (
               <ul className="space-y-3">
-                {topProducts.map((p, i) => (
-                  <li key={i} className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-sm">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-medium text-slate-600">
-                        {i + 1}
-                      </span>
-                      <Link href={`/products/${p.slug}`} className="font-medium text-slate-900 hover:text-sky-700">
-                        {p.name}
-                      </Link>
-                    </span>
-                    <Badge variant="secondary">{p.count} clicks</Badge>
+                {paidOrdersRes.data.map((order: any) => (
+                  <li key={order.id} className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium text-slate-900">#{order.order_number}</span>
+                      <span className="ml-2 text-sm text-slate-500">{order.customer_name}</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-sm">{formatPrice(order.total, 'ZAR')}</p>
+                      <p className="text-xs text-slate-400">{formatDate(order.created_at)}</p>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -113,6 +97,7 @@ export default async function AdminDashboard() {
           </CardContent>
         </Card>
 
+        {/* Recent Messages */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -148,25 +133,36 @@ export default async function AdminDashboard() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
-          <Button asChild className="gap-1">
-            <Link href="/admin/products/new">
-              <Package className="h-4 w-4" />
-              Add Product
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="gap-1">
-            <Link href="/admin/blog/new">
-              <FileText className="h-4 w-4" />
-              Write Article
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="gap-1">
-            <Link href="/admin/analytics">
-              <TrendingUp className="h-4 w-4" />
-              View Analytics
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </Button>
+            <Button asChild className="gap-1">
+              <Link href="/admin/products/new">
+                <Package className="h-4 w-4" />
+                Add Product
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="gap-1">
+              <Link href="/admin/suppliers">
+                <Truck className="h-4 w-4" />
+                Manage Suppliers
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="gap-1">
+              <Link href="/admin/orders">
+                <ShoppingCart className="h-4 w-4" />
+                View Orders
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="gap-1">
+              <Link href="/admin/profit">
+                <DollarSign className="h-4 w-4" />
+                Profit Dashboard
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="gap-1">
+              <Link href="/admin/marketplace">
+                <Package className="h-4 w-4" />
+                Supplier Marketplace
+              </Link>
+            </Button>
           </div>
         </CardContent>
       </Card>

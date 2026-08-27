@@ -1,14 +1,15 @@
 import Link from 'next/link';
-import { Mail } from 'lucide-react';
+import { Mail, ShoppingCart } from 'lucide-react';
 import { SITE_NAME, SITE_TAGLINE } from '@/lib/constants';
 
 const FOOTER_LINKS = [
   {
-    title: 'Explore',
+    title: 'Shop',
     links: [
       { href: '/products', label: 'All Products' },
-      { href: '/blog', label: 'Blog' },
-      { href: '/search', label: 'Search' },
+      { href: '/category/electronics', label: 'Electronics' },
+      { href: '/category/fashion', label: 'Fashion' },
+      { href: '/category/home-garden', label: 'Home & Garden' },
     ],
   },
   {
@@ -16,6 +17,7 @@ const FOOTER_LINKS = [
     links: [
       { href: '/about', label: 'About Us' },
       { href: '/contact', label: 'Contact' },
+      { href: '/blog', label: 'Blog' },
       { href: '/admin', label: 'Admin Login' },
     ],
   },
@@ -37,11 +39,16 @@ export function SiteFooter() {
           <div className="space-y-3">
             <Link href="/" className="flex items-center gap-2 font-bold text-lg text-white">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-900 text-sm">
-                DV
+                ES
               </span>
               {SITE_NAME}
             </Link>
             <p className="text-sm text-slate-400 max-w-xs">{SITE_TAGLINE}</p>
+            <div className="flex gap-3 mt-4">
+              <Link href="/cart" className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                <ShoppingCart className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
 
           {FOOTER_LINKS.map((section) => (

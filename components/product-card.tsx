@@ -1,14 +1,43 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
-import { Star, ExternalLink, Tag } from 'lucide-react';
+import { Star, ShoppingCart, Tag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CopyLinkButton } from '@/components/copy-link-button';
 import { formatPrice } from '@/lib/format';
+import { useCart } from '@/hooks/use-cart';
 import type { Product } from '@/lib/types';
+import { toast } from 'sonner';
 
 export function ProductCard({ product }: { product: Product }) {
+  const { addItem } = useCart();
+  const displayPrice = product.selling_price || product.price;
+  const isOnSale = product.sale_price && product.sale_price < (product.price || 0);
+
+  function handleAddToCart(e: React.MouseEvent) {
+    e.preventDefault();
+    if (!displayPrice) return;
+    
+    addItem({
+      productId: product.id,
+      name: product.name,
+      slug: product.slug,
+      image_url: product.image_url,
+      price: product.price || displayPrice || 0,
+      sale_price: product.sale_price,
+      product_type: product.product_type || 'affiliate',
+      shipping_estimate: product.shipping_estimate,
+      stock_status: product.stock_status,
+    });
+    
+    toast.success(`${product.name} added to cart`);
+  }
+
+  // For affiliate products, keep the "Get Deal" link
+  const isAffiliate = product.product_type === 'affiliate';
+
   return (
     <Card className="group overflow-hidden flex flex-col transition-all hover:shadow-lg">
       <Link href={`/products/${product.slug}`} className="relative block aspect-[4/3] overflow-hidden bg-slate-100">
@@ -27,6 +56,12 @@ export function ProductCard({ product }: { product: Product }) {
         )}
         {product.featured && (
           <Badge className="absolute left-2 top-2 bg-amber-500 hover:bg-amber-500">Featured</Badge>
+        )}
+        {isOnSale && (
+          <Badge className="absolute right-2 top-2 bg-red-500 hover:bg-red-500">Sale</Badge>
+        )}
+        {product.stock_status === 'out_of_stock' && (
+          <Badge variant="secondary" className="absolute right-2 top-2">Out of Stock</Badge>
         )}
       </Link>
 
@@ -61,20 +96,39 @@ export function ProductCard({ product }: { product: Product }) {
         </div>
 
         <div className="mt-auto pt-3 flex items-center justify-between">
-          <span className="text-lg font-bold text-slate-900">
-            {formatPrice(product.price, product.currency)}
-          </span>
+          <div>
+            {isOnSale && (
+              <span className="text-sm text-slate-400 line-through mr-2">
+                {formatPrice(product.price, product.currency || 'ZAR')}
+              </span>
+            )}
+            <span className="text-lg font-bold text-slate-900">
+              {formatPrice(isOnSale ? (product.sale_price ?? null) : (displayPrice ?? null), product.currency || 'ZAR')}
+            </span>
+          </div>
+          {product.shipping_estimate && (
+            <span className="text-xs text-slate-500">{product.shipping_estimate}</span>
+          )}
         </div>
       </CardContent>
 
       <CardFooter className="flex gap-2 p-4 pt-0">
-        <Button asChild className="flex-1">
-          <Link href={`/go/${product.slug}`}>
-            Get Deal
-            <ExternalLink className="ml-1 h-3.5 w-3.5" />
-          </Link>
-        </Button>
-        <CopyLinkButton slug={product.slug} size="icon" className="shrink-0" />
+        {isAffiliate ? (
+          <Button asChild className="flex-1">
+            <Link href={`/go/${product.slug}`}>
+              Get Deal
+            </Link>
+          </Button>
+        ) : (
+          <Button
+            className="flex-1 gap-1"
+            onClick={handleAddToCart}
+            disabled={product.stock_status === 'out_of_stock'}
+          >
+            <ShoppingCart className="h-4 w-4" />
+            {product.stock_status === 'out_of_stock' ? 'Out of Stock' : 'Add to Cart'}
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );

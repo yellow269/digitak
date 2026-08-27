@@ -1,13 +1,12 @@
 import Link from 'next/link';
-import { ArrowRight, Search, Sparkles, TrendingUp, Clock, ShieldCheck, Star, Eye } from 'lucide-react';
+import { ArrowRight, Search, Sparkles, TrendingUp, Clock, ShieldCheck, Star, Truck, CreditCard, RefreshCw, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProductCard } from '@/components/product-card';
 import { NewsletterForm } from '@/components/newsletter-form';
 import { createPublicSupabaseClient } from '@/lib/supabase/server';
-import { AFFILIATE_DISCLOSURE_SHORT, SITE_NAME } from '@/lib/constants';
+import { SITE_NAME } from '@/lib/constants';
 import { PUBLIC_PRODUCT_COLUMNS } from '@/lib/queries';
 import type { Product, Category } from '@/lib/types';
 
@@ -43,7 +42,6 @@ async function getHomeData() {
       .limit(100),
   ]);
 
-  // Count products per category for "popular categories"
   const catCounts: Record<string, number> = {};
   (popularCats.data as unknown as { category: Category }[])?.forEach((row) => {
     if (row.category) {
@@ -53,7 +51,7 @@ async function getHomeData() {
   const popularCategories = (categories.data as Category[])
     ?.map((c) => ({ ...c, count: catCounts[c.id] || 0 }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
+    .slice(0, 8);
 
   return {
     featured: (featured.data as unknown as Product[]) || [],
@@ -69,32 +67,33 @@ export default async function HomePage() {
 
   return (
     <div className="flex flex-col">
-      {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-sky-50 via-white to-white">
-        <div className="absolute inset-0 bg-grid-slate-100 [background-image:linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] [background-size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" />
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="absolute inset-0 bg-grid-white/5 [background-image:linear-gradient(to_right,#ffffff10_1px,transparent_1px),linear-gradient(to_bottom,#ffffff10_1px,transparent_1px)] [background-size:64px_64px]" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-b from-sky-500/20 to-transparent rounded-full blur-3xl" />
         <div className="container relative mx-auto max-w-7xl px-4 py-16 sm:py-24">
           <div className="mx-auto max-w-3xl text-center">
-            <Badge variant="secondary" className="mb-4 gap-1">
+            <Badge variant="secondary" className="mb-4 gap-1 bg-white/10 text-white border-white/20">
               <Sparkles className="h-3.5 w-3.5" />
-              Curated digital products for South Africa
+              Welcome to {SITE_NAME}
             </Badge>
-            <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-              Discover Digital Products That Can Help You{' '}
-              <span className="bg-gradient-to-r from-sky-600 to-cyan-500 bg-clip-text text-transparent">
-                Work Smarter
+            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
+              Everything You Need,{' '}
+              <span className="bg-gradient-to-r from-sky-400 to-cyan-300 bg-clip-text text-transparent">
+                All in One Place
               </span>
             </h1>
-            <p className="mt-6 text-lg text-slate-600 sm:text-xl">
-              Explore software, AI tools, business resources, courses, ebooks and more.
+            <p className="mt-6 text-lg text-slate-300 sm:text-xl">
+              Shop from thousands of products with fast delivery, secure payments and great prices.
             </p>
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <Button asChild size="lg" className="gap-1">
+              <Button asChild size="lg" className="gap-1 bg-sky-500 hover:bg-sky-600 text-white">
                 <Link href="/products">
-                  Explore Products
+                  Start Shopping
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline">
+              <Button asChild size="lg" variant="outline" className="border-white/20 text-white hover:bg-white/10">
                 <Link href="/blog">Read the Blog</Link>
               </Button>
             </div>
@@ -106,8 +105,8 @@ export default async function HomePage() {
               <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <input
                 name="q"
-                placeholder="Search for AI tools, courses, software..."
-                className="h-14 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-24 text-base shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                placeholder="Search for products, brands, categories..."
+                className="h-14 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-24 text-base shadow-lg focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                 aria-label="Search products"
                 maxLength={100}
               />
@@ -115,6 +114,22 @@ export default async function HomePage() {
                 Search
               </Button>
             </form>
+          </div>
+
+          {/* Trust badges */}
+          <div className="mx-auto mt-10 grid max-w-2xl grid-cols-2 gap-4 sm:grid-cols-4">
+            {[
+              { icon: Truck, label: 'Free Shipping', sub: 'On orders over R500' },
+              { icon: CreditCard, label: 'Secure Payment', sub: 'PayFast encrypted' },
+              { icon: RefreshCw, label: 'Easy Returns', sub: '30-day policy' },
+              { icon: ShieldCheck, label: 'Buyer Protection', sub: '100% secure' },
+            ].map((item) => (
+              <div key={item.label} className="flex flex-col items-center gap-1 text-center">
+                <item.icon className="h-5 w-5 text-sky-400" />
+                <p className="text-xs font-medium text-white">{item.label}</p>
+                <p className="text-[10px] text-slate-400">{item.sub}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -146,17 +161,17 @@ export default async function HomePage() {
       {popularCategories && popularCategories.length > 0 && (
         <section className="bg-slate-50 py-12">
           <div className="container mx-auto max-w-7xl px-4">
-            <h2 className="mb-6 text-2xl font-bold text-slate-900">Popular Categories</h2>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            <h2 className="mb-6 text-2xl font-bold text-slate-900">Shop by Category</h2>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {popularCategories.map((cat) => (
                 <Link key={cat.id} href={`/category/${cat.slug}`}>
-                  <Card className="h-full transition-all hover:shadow-md hover:border-sky-300">
-                    <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                      <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sky-600">
-                        <Sparkles className="h-5 w-5" />
+                  <Card className="h-full transition-all hover:shadow-md hover:border-sky-300 group">
+                    <CardContent className="flex flex-col items-center justify-center p-6 text-center">
+                      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-sky-100 text-sky-600 group-hover:bg-sky-200 transition-colors">
+                        <Package className="h-6 w-6" />
                       </div>
-                      <p className="text-sm font-medium text-slate-900 line-clamp-2">{cat.name}</p>
-                      <p className="text-xs text-slate-500">{cat.count} products</p>
+                      <p className="font-medium text-slate-900">{cat.name}</p>
+                      <p className="text-xs text-slate-500 mt-1">{cat.count} products</p>
                     </CardContent>
                   </Card>
                 </Link>
@@ -166,15 +181,15 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Trending products */}
+      {/* Best Sellers */}
       {trending.length > 0 && (
         <section className="container mx-auto max-w-7xl px-4 py-12">
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-sky-600" />
+              <TrendingUp className="h-6 w-6 text-sky-600" />
               <div>
-                <h2 className="text-2xl font-bold text-slate-900">Trending Products</h2>
-                <p className="text-sm text-slate-500">Top-rated by our community</p>
+                <h2 className="text-2xl font-bold text-slate-900">Best Sellers</h2>
+                <p className="text-sm text-slate-500">Top-rated by our customers</p>
               </div>
             </div>
           </div>
@@ -186,16 +201,16 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Recently added */}
+      {/* Deals / Recently Added */}
       {recent.length > 0 && (
         <section className="bg-slate-50 py-12">
           <div className="container mx-auto max-w-7xl px-4">
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-6 w-6 text-sky-600" />
+                <Clock className="h-6 w-6 text-sky-600" />
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900">Recently Added</h2>
-                  <p className="text-sm text-slate-500">The latest additions to our catalogue</p>
+                  <h2 className="text-2xl font-bold text-slate-900">New Arrivals</h2>
+                  <p className="text-sm text-slate-500">The latest additions to our store</p>
                 </div>
               </div>
               <Button asChild variant="ghost" className="gap-1">
@@ -214,28 +229,33 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Why Everything Store */}
+      {/* Why Shop With Us */}
       <section className="container mx-auto max-w-7xl px-4 py-16">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-slate-900">Why {SITE_NAME}?</h2>
-          <p className="mt-2 text-slate-500">We help you find digital products worth your time and money.</p>
+          <h2 className="text-3xl font-bold text-slate-900">Why Shop With Us?</h2>
+          <p className="mt-2 text-slate-500">We make online shopping easy, safe and affordable.</p>
         </div>
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
+        <div className="mt-10 grid gap-6 md:grid-cols-4">
           {[
             {
+              icon: Truck,
+              title: 'Fast Delivery',
+              desc: 'Direct from supplier to your door. No middlemen, no delays.',
+            },
+            {
               icon: ShieldCheck,
-              title: 'Vetted & Transparent',
-              desc: 'Every product is reviewed before listing. We clearly disclose all affiliate relationships.',
+              title: 'Secure Payments',
+              desc: 'Pay securely with PayFast. Your data is always protected.',
             },
             {
               icon: Star,
-              title: 'Quality First',
-              desc: 'We focus on products with strong ratings and genuine value — no filler, no fluff.',
+              title: 'Quality Products',
+              desc: 'Every product is vetted before listing. Quality you can trust.',
             },
             {
-              icon: Eye,
-              title: 'Always Honest',
-              desc: 'No fake reviews or inflated claims. What you see is what you get.',
+              icon: CreditCard,
+              title: 'Best Prices',
+              desc: 'Competitive pricing with transparent costs. No hidden fees.',
             },
           ].map((f) => (
             <Card key={f.title}>
@@ -251,47 +271,33 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Affiliate disclosure */}
-      <section className="bg-amber-50 border-y border-amber-100">
-        <div className="container mx-auto max-w-7xl px-4 py-6">
-          <p className="text-center text-sm text-amber-800">
-            <strong>Affiliate Disclosure:</strong> {AFFILIATE_DISCLOSURE_SHORT}{' '}
-            <Link href="/affiliate-disclosure" className="underline hover:text-amber-900">
-              Learn more
-            </Link>
-          </p>
-        </div>
-      </section>
-
       {/* Newsletter + CTA */}
-      <section className="container mx-auto max-w-7xl px-4 py-16">
-        <div className="grid gap-8 lg:grid-cols-2">
-          <Card className="bg-slate-900 text-white">
-            <CardContent className="p-8">
+      <section className="bg-slate-900 py-16">
+        <div className="container mx-auto max-w-7xl px-4">
+          <div className="grid gap-8 lg:grid-cols-2">
+            <div className="text-white">
               <h2 className="text-2xl font-bold">Stay in the loop</h2>
               <p className="mt-2 text-slate-300">
-                Get notified about new digital products, tools and resources. No spam, ever.
+                Get notified about new products, deals and exclusive offers. No spam, ever.
               </p>
               <div className="mt-6">
                 <NewsletterForm />
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          <Card className="border-sky-200 bg-gradient-to-br from-sky-50 to-cyan-50">
-            <CardContent className="flex h-full flex-col items-center justify-center p-8 text-center">
-              <h2 className="text-2xl font-bold text-slate-900">Ready to explore?</h2>
-              <p className="mt-2 text-slate-600">
-                Browse our full catalogue of digital products, tools and resources.
+            <div className="flex flex-col items-center justify-center text-center text-white">
+              <h2 className="text-2xl font-bold">Ready to shop?</h2>
+              <p className="mt-2 text-slate-300">
+                Browse our full catalogue and find exactly what you need.
               </p>
-              <Button asChild size="lg" className="mt-6 gap-1">
+              <Button asChild size="lg" className="mt-6 gap-1 bg-sky-500 hover:bg-sky-600">
                 <Link href="/products">
                   Browse all products
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </section>
     </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Save, Trash2, Star, Plus, X } from 'lucide-react';
+import { Loader2, Save, Trash2, Star, Plus, X, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
-import { slugify } from '@/lib/format';
-import type { Category } from '@/lib/types';
+import { slugify, formatPrice } from '@/lib/format';
+import { PRODUCT_TYPES, STOCK_STATUSES } from '@/lib/constants';
+import type { Category, Supplier, ProductType, StockStatus } from '@/lib/types';
 
 type ProductFormData = {
   name: string;
@@ -25,6 +26,7 @@ type ProductFormData = {
   image_url: string;
   affiliate_url: string;
   price: string;
+  sale_price: string;
   currency: string;
   rating: string;
   review_count: string;
@@ -32,6 +34,18 @@ type ProductFormData = {
   status: string;
   seo_title: string;
   seo_description: string;
+  product_type: ProductType;
+  supplier_id: string;
+  supplier_sku: string;
+  supplier_cost: string;
+  supplier_shipping_cost: string;
+  markup_percentage: string;
+  markup_amount: string;
+  selling_price: string;
+  stock_status: StockStatus;
+  shipping_estimate: string;
+  supplier_url: string;
+  quantity_available: string;
 };
 
 const EMPTY: ProductFormData = {
@@ -45,6 +59,7 @@ const EMPTY: ProductFormData = {
   image_url: '',
   affiliate_url: '',
   price: '',
+  sale_price: '',
   currency: 'ZAR',
   rating: '0',
   review_count: '0',
@@ -52,6 +67,18 @@ const EMPTY: ProductFormData = {
   status: 'draft',
   seo_title: '',
   seo_description: '',
+  product_type: 'affiliate',
+  supplier_id: '',
+  supplier_sku: '',
+  supplier_cost: '',
+  supplier_shipping_cost: '',
+  markup_percentage: '40',
+  markup_amount: '',
+  selling_price: '',
+  stock_status: 'in_stock',
+  shipping_estimate: '',
+  supplier_url: '',
+  quantity_available: '0',
 };
 
 export function ProductForm({
@@ -68,16 +95,48 @@ export function ProductForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [benefitInput, setBenefitInput] = useState('');
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [priceOverride, setPriceOverride] = useState(false);
 
   useEffect(() => {
     if (initialData) {
       setForm({ ...EMPTY, ...initialData });
+      if (initialData.selling_price) setPriceOverride(true);
     }
   }, [initialData]);
+
+  useEffect(() => {
+    async function loadSuppliers() {
+      const supabase = createClient();
+      const { data } = await supabase.from('suppliers').select('*').eq('active', true).order('name');
+      setSuppliers((data as Supplier[]) || []);
+    }
+    loadSuppliers();
+  }, []);
 
   function update<K extends keyof ProductFormData>(key: K, value: ProductFormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
+
+  // Live profit calculation
+  const calculatedSellingPrice = (() => {
+    if (priceOverride && form.selling_price) return parseFloat(form.selling_price) || 0;
+    const cost = parseFloat(form.supplier_cost) || 0;
+    const shipping = parseFloat(form.supplier_shipping_cost) || 0;
+    const markupPct = parseFloat(form.markup_percentage) || 0;
+    const markupAmt = parseFloat(form.markup_amount) || 0;
+    const base = cost + shipping;
+    return base + (base * markupPct / 100) + markupAmt;
+  })();
+
+  const calculatedProfit = (() => {
+    const cost = parseFloat(form.supplier_cost) || 0;
+    const shipping = parseFloat(form.supplier_shipping_cost) || 0;
+    const markupPct = parseFloat(form.markup_percentage) || 0;
+    const markupAmt = parseFloat(form.markup_amount) || 0;
+    const base = cost + shipping;
+    return (base * markupPct / 100) + markupAmt;
+  })();
 
   function addBenefit() {
     const b = benefitInput.trim();
@@ -95,8 +154,15 @@ export function ProductForm({
     setLoading(true);
     setError('');
 
-    if (!form.name || !form.slug || !form.affiliate_url) {
-      setError('Name, slug and affiliate URL are required.');
+    if (!form.name || !form.slug) {
+      setError('Name and slug are required.');
+      setLoading(false);
+      return;
+    }
+
+    // For affiliate products, affiliate_url is required
+    if (form.product_type === 'affiliate' && !form.affiliate_url) {
+      setError('Affiliate URL is required for affiliate products.');
       setLoading(false);
       return;
     }
@@ -111,8 +177,9 @@ export function ProductForm({
       category_id: form.category_id || null,
       vendor_name: form.vendor_name || null,
       image_url: form.image_url || null,
-      affiliate_url: form.affiliate_url,
-      price: form.price ? parseFloat(form.price) : null,
+      affiliate_url: form.affiliate_url || null,
+      price: priceOverride ? parseFloat(form.selling_price) || null : form.price ? parseFloat(form.price) : null,
+      sale_price: form.sale_price ? parseFloat(form.sale_price) : null,
       currency: form.currency,
       rating: parseFloat(form.rating) || 0,
       review_count: parseInt(form.review_count, 10) || 0,
@@ -120,6 +187,19 @@ export function ProductForm({
       status: form.status,
       seo_title: form.seo_title || null,
       seo_description: form.seo_description || null,
+      product_type: form.product_type,
+      supplier_id: form.supplier_id || null,
+      supplier_sku: form.supplier_sku || null,
+      supplier_cost: form.supplier_cost ? parseFloat(form.supplier_cost) : null,
+      supplier_shipping_cost: form.supplier_shipping_cost ? parseFloat(form.supplier_shipping_cost) : null,
+      markup_percentage: form.markup_percentage ? parseFloat(form.markup_percentage) : null,
+      markup_amount: form.markup_amount ? parseFloat(form.markup_amount) : null,
+      selling_price: calculatedSellingPrice || null,
+      estimated_profit: calculatedProfit || null,
+      stock_status: form.stock_status,
+      shipping_estimate: form.shipping_estimate || null,
+      supplier_url: form.supplier_url || null,
+      quantity_available: parseInt(form.quantity_available, 10) || 0,
     };
 
     let result;
@@ -189,6 +269,39 @@ export function ProductForm({
             </div>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="product_type">Product Type *</Label>
+              <Select value={form.product_type} onValueChange={(v) => update('product_type', v as ProductType)}>
+                <SelectTrigger id="product_type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRODUCT_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="category_id">Category</Label>
+              <Select
+                value={form.category_id || 'none'}
+                onValueChange={(v) => update('category_id', v === 'none' ? '' : v)}
+              >
+                <SelectTrigger id="category_id">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No category</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div>
             <Label htmlFor="short_description">Short Description</Label>
             <Textarea
@@ -246,85 +359,177 @@ export function ProductForm({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Categorization &amp; Vendor</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="category_id">Category</Label>
-              <Select
-                value={form.category_id || 'none'}
-                onValueChange={(v) => update('category_id', v === 'none' ? '' : v)}
-              >
-                <SelectTrigger id="category_id">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No category</SelectItem>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Supplier Information (for dropshipping) */}
+      {(form.product_type === 'dropshipping') && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Supplier Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label>Supplier</Label>
+                <Select value={form.supplier_id || 'none'} onValueChange={(v) => update('supplier_id', v === 'none' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No supplier</SelectItem>
+                    {suppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Supplier SKU</Label>
+                <Input value={form.supplier_sku} onChange={(e) => update('supplier_sku', e.target.value)} />
+              </div>
             </div>
             <div>
-              <Label htmlFor="vendor_name">Vendor Name</Label>
-              <Input
-                id="vendor_name"
-                value={form.vendor_name}
-                onChange={(e) => update('vendor_name', e.target.value)}
-              />
+              <Label>Supplier Product URL</Label>
+              <Input value={form.supplier_url} onChange={(e) => update('supplier_url', e.target.value)} placeholder="https://..." />
             </div>
-          </div>
-        </CardContent>
-      </Card>
+            <div>
+              <Label>Notes (Fulfillment instructions for this supplier)</Label>
+              <Textarea value={form.supplier_sku} onChange={(e) => update('supplier_sku', e.target.value)} rows={2} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
+      {/* Pricing */}
       <Card>
         <CardHeader>
           <CardTitle>Pricing &amp; Rating</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <Label htmlFor="price">Price</Label>
-              <Input
-                id="price"
-                type="number"
-                step="0.01"
-                value={form.price}
-                onChange={(e) => update('price', e.target.value)}
-              />
+          {form.product_type === 'dropshipping' ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <Label>Supplier Cost (R)</Label>
+                  <Input type="number" step="0.01" value={form.supplier_cost} onChange={(e) => update('supplier_cost', e.target.value)} />
+                </div>
+                <div>
+                  <Label>Shipping Cost (R)</Label>
+                  <Input type="number" step="0.01" value={form.supplier_shipping_cost} onChange={(e) => update('supplier_shipping_cost', e.target.value)} />
+                </div>
+                <div>
+                  <Label>Markup %</Label>
+                  <Input type="number" step="1" value={form.markup_percentage} onChange={(e) => update('markup_percentage', e.target.value)} />
+                </div>
+                <div>
+                  <Label>Markup Amount (R)</Label>
+                  <Input type="number" step="0.01" value={form.markup_amount} onChange={(e) => update('markup_amount', e.target.value)} />
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <Switch id="price_override" checked={priceOverride} onCheckedChange={setPriceOverride} />
+                <Label htmlFor="price_override">Override selling price manually</Label>
+              </div>
+              
+              {priceOverride ? (
+                <div>
+                  <Label>Selling Price (R) *</Label>
+                  <Input type="number" step="0.01" value={form.selling_price} onChange={(e) => update('selling_price', e.target.value)} required />
+                </div>
+              ) : null}
+
+              {/* Live calculation */}
+              <div className="rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calculator className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-800">Live Profit Calculation</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <p className="text-green-600">Supplier Cost</p>
+                    <p className="font-semibold">{formatPrice(parseFloat(form.supplier_cost) || 0, 'ZAR')}</p>
+                  </div>
+                  <div>
+                    <p className="text-green-600">+ Shipping</p>
+                    <p className="font-semibold">{formatPrice(parseFloat(form.supplier_shipping_cost) || 0, 'ZAR')}</p>
+                  </div>
+                  <div>
+                    <p className="text-green-600">Selling Price</p>
+                    <p className="font-bold text-lg">{formatPrice(calculatedSellingPrice, 'ZAR')}</p>
+                  </div>
+                  <div>
+                    <p className="text-green-600">Estimated Profit</p>
+                    <p className="font-bold text-lg text-green-700">{formatPrice(calculatedProfit, 'ZAR')}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label>Stock Status</Label>
+                  <Select value={form.stock_status} onValueChange={(v) => update('stock_status', v as StockStatus)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {STOCK_STATUSES.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Shipping Estimate</Label>
+                  <Input value={form.shipping_estimate} onChange={(e) => update('shipping_estimate', e.target.value)} placeholder="e.g. 5-10 business days" />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <Label htmlFor="price">Price</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  value={form.price}
+                  onChange={(e) => update('price', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="sale_price">Sale Price (optional)</Label>
+                <Input
+                  id="sale_price"
+                  type="number"
+                  step="0.01"
+                  value={form.sale_price}
+                  onChange={(e) => update('sale_price', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="currency">Currency</Label>
+                <Select value={form.currency} onValueChange={(v) => update('currency', v)}>
+                  <SelectTrigger id="currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ZAR">ZAR (R)</SelectItem>
+                    <SelectItem value="USD">USD ($)</SelectItem>
+                    <SelectItem value="EUR">EUR (€)</SelectItem>
+                    <SelectItem value="GBP">GBP (£)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="rating">Rating (0-5)</Label>
+                <Input
+                  id="rating"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="5"
+                  value={form.rating}
+                  onChange={(e) => update('rating', e.target.value)}
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="currency">Currency</Label>
-              <Select value={form.currency} onValueChange={(v) => update('currency', v)}>
-                <SelectTrigger id="currency">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ZAR">ZAR (R)</SelectItem>
-                  <SelectItem value="USD">USD ($)</SelectItem>
-                  <SelectItem value="EUR">EUR (€)</SelectItem>
-                  <SelectItem value="GBP">GBP (£)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="rating">Rating (0-5)</Label>
-              <Input
-                id="rating"
-                type="number"
-                step="0.1"
-                min="0"
-                max="5"
-                value={form.rating}
-                onChange={(e) => update('rating', e.target.value)}
-              />
-            </div>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="review_count">Review Count</Label>
               <Input
@@ -335,6 +540,10 @@ export function ProductForm({
                 onChange={(e) => update('review_count', e.target.value)}
               />
             </div>
+            <div>
+              <Label>Vendor Name</Label>
+              <Input value={form.vendor_name} onChange={(e) => update('vendor_name', e.target.value)} />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -344,20 +553,22 @@ export function ProductForm({
           <CardTitle>Links &amp; Image</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="affiliate_url">Affiliate URL *</Label>
-            <Input
-              id="affiliate_url"
-              type="url"
-              value={form.affiliate_url}
-              onChange={(e) => update('affiliate_url', e.target.value)}
-              required
-              placeholder="https://www.digistore24.com/..."
-            />
-            <p className="mt-1 text-xs text-slate-500">
-              This is where the &quot;Get Deal&quot; button will redirect visitors.
-            </p>
-          </div>
+          {form.product_type === 'affiliate' && (
+            <div>
+              <Label htmlFor="affiliate_url">Affiliate URL *</Label>
+              <Input
+                id="affiliate_url"
+                type="url"
+                value={form.affiliate_url}
+                onChange={(e) => update('affiliate_url', e.target.value)}
+                required
+                placeholder="https://www.digistore24.com/..."
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                This is where the &quot;Get Deal&quot; button will redirect visitors.
+              </p>
+            </div>
+          )}
           <div>
             <Label htmlFor="image_url">Image URL</Label>
             <Input

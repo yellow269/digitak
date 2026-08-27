@@ -2,15 +2,18 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Menu, Search, X, Shield } from 'lucide-react';
+import { Menu, Search, X, Shield, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
 import { SITE_NAME } from '@/lib/constants';
+import { useCart } from '@/hooks/use-cart';
+import { CartDrawer } from '@/components/cart-drawer';
 
 const NAV_LINKS = [
   { href: '/', label: 'Home' },
-  { href: '/products', label: 'Products' },
+  { href: '/products', label: 'Shop' },
   { href: '/blog', label: 'Blog' },
   { href: '/about', label: 'About' },
   { href: '/contact', label: 'Contact' },
@@ -18,13 +21,14 @@ const NAV_LINKS = [
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const { itemCount } = useCart();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70">
       <div className="container mx-auto flex h-16 max-w-7xl items-center gap-4 px-4">
         <Link href="/" className="flex items-center gap-2 font-bold text-lg">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white text-sm">
-            DV
+            ES
           </span>
           <span className="hidden sm:inline text-slate-900">{SITE_NAME}</span>
         </Link>
@@ -51,6 +55,7 @@ export function SiteHeader() {
               aria-label="Search products"
             />
           </form>
+          <CartDrawer />
           <Button asChild variant="outline" size="sm">
             <Link href="/admin">
               <Shield className="mr-1 h-4 w-4" />
@@ -91,6 +96,15 @@ export function SiteHeader() {
                     </Link>
                   </SheetClose>
                 ))}
+                <SheetClose asChild>
+                  <Link
+                    href="/cart"
+                    className="px-3 py-2 text-base font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-2"
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                    Cart {itemCount > 0 && <Badge variant="secondary">{itemCount}</Badge>}
+                  </Link>
+                </SheetClose>
                 <SheetClose asChild>
                   <Link
                     href="/admin"
