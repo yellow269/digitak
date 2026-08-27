@@ -1,8 +1,8 @@
 /*
-# DigitalVault SA — Initial Schema
+# Everything Store — Initial Schema
 
 ## Overview
-Creates the full database schema for the DigitalVault SA affiliate digital-products storefront: profiles, categories, products, tags, blog posts, affiliate click tracking, contact messages, and newsletter subscribers. Every table has Row Level Security enabled.
+Creates the full database schema for the Everything Store affiliate digital-products storefront: profiles, categories, products, tags, blog posts, affiliate click tracking, contact messages, and newsletter subscribers. Every table has Row Level Security enabled.
 
 ## New Tables
 1. `profiles` — extends `auth.users` with a role (user/admin) and display name.

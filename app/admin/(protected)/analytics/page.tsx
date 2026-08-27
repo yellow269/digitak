@@ -193,7 +193,7 @@ export default async function AdminAnalyticsPage() {
       </Card>
 
       <p className="text-xs text-slate-400">
-        Note: DigitalVault SA does not display affiliate revenue. Revenue data would require an official API integration with the affiliate network.
+        Note: Everything Store does not display affiliate revenue. Revenue data would require an official API integration with the affiliate network.
       </p>
     </div>
   );

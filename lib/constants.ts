@@ -1,4 +1,4 @@
-export const SITE_NAME = 'DigitalVault SA';
+export const SITE_NAME = 'Everything Store';
 export const SITE_TAGLINE = 'Discover digital products, tools and resources worth your time.';
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://digitalvaultsa.co.za';
 

@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const category = await getCategory(slug);
   if (!category) return { title: 'Category not found' };
-  const title = category.seo_title || `${category.name} | DigitalVault SA`;
+  const title = category.seo_title || `${category.name} | Everything Store`;
   const description = category.seo_description || category.description || '';
   return {
     title,

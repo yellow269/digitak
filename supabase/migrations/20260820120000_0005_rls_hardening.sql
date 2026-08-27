@@ -1,5 +1,5 @@
 /*
-# DigitalVault SA — RLS & Security Hardening
+# Everything Store — RLS & Security Hardening
 
 ## Overview
 1. Profile update policy: restricts which columns a normal user can update.

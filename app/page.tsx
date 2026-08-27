@@ -214,7 +214,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Why DigitalVault SA */}
+      {/* Why Everything Store */}
       <section className="container mx-auto max-w-7xl px-4 py-16">
         <div className="text-center">
           <h2 className="text-3xl font-bold text-slate-900">Why {SITE_NAME}?</h2>

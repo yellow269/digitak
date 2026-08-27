@@ -1,5 +1,5 @@
 /*
-# DigitalVault SA — Security Hardening
+# Everything Store — Security Hardening
 
 ## Overview
 Fixes security advisor warnings:

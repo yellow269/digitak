@@ -1,5 +1,5 @@
 /*
-# DigitalVault SA — Storage Policies for product-images bucket
+# Everything Store — Storage Policies for product-images bucket
 
 ## Overview
 Adds RLS policies to the storage.objects table for the 'product-images' bucket:

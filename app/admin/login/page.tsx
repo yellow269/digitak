@@ -40,7 +40,7 @@ export default function AdminLoginPage() {
             <Lock className="h-6 w-6" />
           </div>
           <CardTitle className="text-2xl">Admin Login</CardTitle>
-          <p className="text-sm text-slate-500">Sign in to manage DigitalVault SA</p>
+          <p className="text-sm text-slate-500">Sign in to manage Everything Store</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

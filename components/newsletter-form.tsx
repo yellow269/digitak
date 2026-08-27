@@ -81,7 +81,7 @@ export function NewsletterForm() {
           onCheckedChange={(v) => setConsent(v === true)}
           className="mt-0.5"
         />
-        <span>I consent to receive the DigitalVault SA newsletter by email.</span>
+        <span>I consent to receive the Everything Store newsletter by email.</span>
       </label>
       {message && <p className="text-sm text-red-500">{message}</p>}
       <Button type="submit" disabled={status === 'loading'} className="w-full">

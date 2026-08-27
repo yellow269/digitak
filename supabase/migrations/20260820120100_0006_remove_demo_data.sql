@@ -1,5 +1,5 @@
 /*
-# DigitalVault SA — Remove Demo Data
+# Everything Store — Remove Demo Data
 
 ## Overview
 Removes all demo products (prefixed with "[Demo]") from the database.
