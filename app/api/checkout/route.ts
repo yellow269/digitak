@@ -181,24 +181,9 @@ export async function POST(req: NextRequest) {
     // Generate signature
     const signature = generatePayFastSignature(payfastData, PAYFAST_PASSPHRASE);
 
-    // Build form HTML for auto-submit
-    const formData = Object.entries({ ...payfastData, signature })
-      .map(([key, value]) => `<input type="hidden" name="${key}" value="${value}" />`)
-      .join('\n');
-
-    const html = `<!DOCTYPE html>
-<html>
-<head><title>Redirecting to PayFast...</title></head>
-<body>
-  <form id="payfast-form" method="post" action="${PAYFAST_URL}">
-    ${formData}
-  </form>
-  <script>document.getElementById('payfast-form').submit();</script>
-</body>
-</html>`;
-
-    return new NextResponse(html, {
-      headers: { 'Content-Type': 'text/html' },
+    return NextResponse.json({
+      payfast_url: PAYFAST_URL,
+      form_data: { ...payfastData, signature },
     });
   } catch (err) {
     console.error('[Checkout] Error:', err);

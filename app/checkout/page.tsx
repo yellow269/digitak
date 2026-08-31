@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +14,6 @@ import { SOUTH_AFRICAN_PROVINCES } from '@/lib/constants';
 import type { CheckoutFormData } from '@/lib/types';
 
 export default function CheckoutPage() {
-  const router = useRouter();
   const { cart, clearCart, itemCount } = useCart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -89,13 +87,21 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Redirect to PayFast
-      if (data.payfast_url) {
+      // Redirect to PayFast via auto-submitting form
+      if (data.payfast_url && data.form_data) {
         clearCart();
-        window.location.href = data.payfast_url;
-      } else if (data.redirect) {
-        clearCart();
-        router.push(data.redirect);
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = data.payfast_url;
+        for (const [key, value] of Object.entries(data.form_data)) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = String(value);
+          form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        form.submit();
       }
     } catch {
       setError('An error occurred. Please try again.');

@@ -1,6 +1,6 @@
 export const SITE_NAME = 'Everything Store';
 export const SITE_TAGLINE = 'Everything you need, all in one place.';
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://digitalvaultsa.co.za';
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://digitak-r2m5.vercel.app';
 
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   ZAR: 'R',
