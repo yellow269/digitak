@@ -33,22 +33,71 @@ interface CheckoutPayload {
   total: number;
 }
 
+function pfUrlEncode(str: string): string {
+  // Match PHP's urlencode() exactly:
+  // Keeps A-Z a-z 0-9 - _ . unencoded
+  // Encodes everything else, spaces as +
+  return encodeURIComponent(str)
+    .replace(/%20/g, '+')
+    .replace(/!/g, '%21')
+    .replace(/\*/g, '%2A')
+    .replace(/'/g, '%27')
+    .replace(/\(/g, '%28')
+    .replace(/\)/g, '%29')
+    .replace(/~/g, '%7E');
+}
+
 function generatePayFastSignature(data: Record<string, string>, passphrase: string): string {
-  // Sort keys and build string
-  const sortedKeys = Object.keys(data).sort();
-  let str = '';
-  sortedKeys.forEach((key) => {
-    if (data[key] !== '') {
-      str += `${key}=${encodeURIComponent(data[key]).replace(/%20/g, '+')}&`;
+  // Match PayFast PHP SDK (Auth::generateSignature) exactly:
+  // 1. Filter to allowed fields
+  // 2. If passphrase, add it URL-encoded (SDK double-encodes it)
+  // 3. Sort alphabetically by key
+  // 4. Build string: key=urlencode(trim(value))&... (skip empty values)
+  // 5. MD5 hash
+
+  const allowedFields = [
+    'merchant_id', 'merchant_key', 'return_url', 'cancel_url', 'notify_url', 'notify_method',
+    'name_first', 'name_last', 'email_address', 'cell_number',
+    'm_payment_id', 'amount', 'item_name', 'item_description',
+    'custom_int1', 'custom_int2', 'custom_int3', 'custom_int4', 'custom_int5',
+    'custom_str1', 'custom_str2', 'custom_str3', 'custom_str4', 'custom_str5',
+    'email_confirmation', 'confirmation_address',
+    'currency', 'payment_method', 'subscription_type',
+    'passphrase', 'billing_date', 'recurring_amount', 'frequency', 'cycles',
+    'subscription_notify_email', 'subscription_notify_webhook', 'subscription_notify_buyer',
+  ];
+
+  // Filter to only allowed fields
+  const filtered: Record<string, string> = {};
+  for (const key of Object.keys(data)) {
+    if (allowedFields.includes(key)) {
+      filtered[key] = data[key];
     }
-  });
-  str = str.slice(0, -1); // Remove trailing &
-  
-  if (passphrase) {
-    str += `&passphrase=${encodeURIComponent(passphrase).replace(/%20/g, '+')}`;
   }
 
-  return crypto.createHash('md5').update(str).digest('hex');
+  // SDK: $sortAttributes['passphrase'] = urlencode(trim($passPhrase));
+  // Then loop encodes again: urlencode(trim($value))
+  // This means passphrase is DOUBLE-ENCODED in the SDK
+  if (passphrase && passphrase !== '') {
+    filtered['passphrase'] = pfUrlEncode(passphrase.trim());
+  }
+
+  // Sort alphabetically
+  const sortedKeys = Object.keys(filtered).sort();
+
+  // Build parameter string
+  let pfParamString = '';
+  for (const key of sortedKeys) {
+    const value = filtered[key];
+    if (value !== '' && value != null) {
+      pfParamString += `${key}=${pfUrlEncode(value.trim())}&`;
+    }
+  }
+
+  // Remove trailing &
+  pfParamString = pfParamString.slice(0, -1);
+
+  return crypto.createHash('md5').update(pfParamString).digest('hex');
 }
 
 export async function POST(req: NextRequest) {
