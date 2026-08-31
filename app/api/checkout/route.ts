@@ -96,12 +96,12 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Resolve the best price from the database fields
-      // Priority: sale_price (if valid) < price < selling_price
+      // Resolve the best price from database fields
       const dbPrice = product.price != null ? Number(product.price) : null;
       const dbSalePrice = product.sale_price != null ? Number(product.sale_price) : null;
       const dbSellingPrice = product.selling_price != null ? Number(product.selling_price) : null;
 
+      // Try database price resolution first: sale_price > price > selling_price
       let unitPrice = 0;
       if (dbSalePrice != null && dbPrice != null && dbSalePrice > 0 && dbSalePrice < dbPrice) {
         unitPrice = dbSalePrice;
@@ -111,7 +111,17 @@ export async function POST(req: NextRequest) {
         unitPrice = dbSellingPrice;
       }
 
-      console.log('[Checkout] Product:', product.id, '| price:', dbPrice, '| sale_price:', dbSalePrice, '| selling_price:', dbSellingPrice, '| resolved unitPrice:', unitPrice);
+      // Fallback: use the client-sent price if DB resolution produced 0
+      // The cart already resolved the correct price from the same database
+      if (unitPrice <= 0) {
+        const clientPrice = Number(item.price);
+        if (clientPrice > 0 && Number.isFinite(clientPrice)) {
+          unitPrice = clientPrice;
+          console.log('[Checkout] Using client-sent price as fallback:', clientPrice);
+        }
+      }
+
+      console.log('[Checkout] Product:', item.productId, '| db: price=', dbPrice, 'sale_price=', dbSalePrice, 'selling_price=', dbSellingPrice, '| resolved:', unitPrice);
 
       const itemTotal = unitPrice * item.quantity;
       const itemShipping = (product.supplier_shipping_cost || 0) * item.quantity;
