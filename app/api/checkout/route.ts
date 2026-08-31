@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     for (const item of items) {
       const { data: product } = await supabase
         .from('products')
-        .select('id, name, image_url, price, sale_price, product_type, supplier_id, supplier_sku, supplier_cost, supplier_shipping_cost, estimated_profit, stock_status')
+        .select('id, name, image_url, price, sale_price, selling_price, product_type, supplier_id, supplier_sku, supplier_cost, supplier_shipping_cost, estimated_profit, stock_status')
         .eq('id', item.productId)
         .eq('status', 'published')
         .single();
@@ -96,7 +96,11 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const unitPrice = Number(product.sale_price && product.sale_price < product.price ? product.sale_price : product.price);
+      const unitPrice = Number(
+        (product.sale_price && product.sale_price < product.price ? product.sale_price : product.price) ||
+        product.selling_price ||
+        0
+      );
       const itemTotal = unitPrice * item.quantity;
       const itemShipping = (product.supplier_shipping_cost || 0) * item.quantity;
 
