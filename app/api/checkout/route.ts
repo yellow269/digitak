@@ -230,9 +230,25 @@ export async function POST(req: NextRequest) {
     // Generate signature
     const signature = generatePayFastSignature(payfastData, PAYFAST_PASSPHRASE);
 
-    return NextResponse.json({
-      payfast_url: PAYFAST_URL,
-      form_data: { ...payfastData, signature },
+    // Build the complete PayFast form as HTML for direct browser submission
+    const formDataHtml = Object.entries({ ...payfastData, signature })
+      .map(([key, value]) => `<input type="hidden" name="${key}" value="${value}" />`)
+      .join('\n    ');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head><title>Redirecting to PayFast...</title></head>
+<body>
+  <h2>Redirecting to PayFast payment...</h2>
+  <form id="payfast-form" method="post" action="${PAYFAST_URL}">
+    ${formDataHtml}
+  </form>
+  <script>document.getElementById('payfast-form').submit();</script>
+</body>
+</html>`;
+
+    return new NextResponse(html, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });
   } catch (err) {
     console.error('[Checkout] Error:', err);

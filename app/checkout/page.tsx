@@ -79,6 +79,17 @@ export default function CheckoutPage() {
         }),
       });
 
+      const contentType = response.headers.get('content-type') || '';
+
+      if (contentType.includes('text/html')) {
+        clearCart();
+        const html = await response.text();
+        document.open();
+        document.write(html);
+        document.close();
+        return;
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
@@ -87,7 +98,6 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Redirect to PayFast via auto-submitting form
       if (data.payfast_url && data.form_data) {
         clearCart();
         const form = document.createElement('form');
