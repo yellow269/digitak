@@ -84,23 +84,35 @@ export async function POST(req: NextRequest) {
     }[] = [];
 
     for (const item of items) {
-      const { data: product } = await supabase
+      const { data: product, error: productErr } = await supabase
         .from('products')
         .select('id, name, image_url, price, sale_price, selling_price, product_type, supplier_id, supplier_sku, supplier_cost, supplier_shipping_cost, estimated_profit, stock_status')
         .eq('id', item.productId)
         .eq('status', 'published')
         .single();
 
-      if (!product) {
-        console.error('[Checkout] Product not found:', item.productId, '- skipping');
+      if (productErr || !product) {
+        console.error('[Checkout] Product not found:', item.productId, 'error:', productErr?.message);
         continue;
       }
 
-      const unitPrice = Number(
-        (product.sale_price && product.sale_price < product.price ? product.sale_price : product.price) ||
-        product.selling_price ||
-        0
-      );
+      // Resolve the best price from the database fields
+      // Priority: sale_price (if valid) < price < selling_price
+      const dbPrice = product.price != null ? Number(product.price) : null;
+      const dbSalePrice = product.sale_price != null ? Number(product.sale_price) : null;
+      const dbSellingPrice = product.selling_price != null ? Number(product.selling_price) : null;
+
+      let unitPrice = 0;
+      if (dbSalePrice != null && dbPrice != null && dbSalePrice > 0 && dbSalePrice < dbPrice) {
+        unitPrice = dbSalePrice;
+      } else if (dbPrice != null && dbPrice > 0) {
+        unitPrice = dbPrice;
+      } else if (dbSellingPrice != null && dbSellingPrice > 0) {
+        unitPrice = dbSellingPrice;
+      }
+
+      console.log('[Checkout] Product:', product.id, '| price:', dbPrice, '| sale_price:', dbSalePrice, '| selling_price:', dbSellingPrice, '| resolved unitPrice:', unitPrice);
+
       const itemTotal = unitPrice * item.quantity;
       const itemShipping = (product.supplier_shipping_cost || 0) * item.quantity;
 
@@ -124,18 +136,19 @@ export async function POST(req: NextRequest) {
 
     let serverTotal = Number(serverSubtotal) + Number(serverShipping);
 
+    console.log('[Checkout] serverSubtotal:', serverSubtotal, '| serverShipping:', serverShipping, '| serverTotal:', serverTotal);
+
     // Validate serverTotal is a finite number greater than 0
     if (!Number.isFinite(serverTotal) || serverTotal <= 0) {
-      console.error('[Checkout] Invalid serverTotal:', serverTotal, 'subtotal:', serverSubtotal, 'shipping:', serverShipping);
+      console.error('[Checkout] Invalid serverTotal:', serverTotal);
       return NextResponse.json({ error: 'Unable to calculate order total. Please check your cart.' }, { status: 400 });
     }
 
-    // Round to 2 decimal places
+    // Round to 2 decimal places, then format for PayFast: numeric only, exactly 2 decimal places
     serverTotal = Math.round(serverTotal * 100) / 100;
-
-    // Format amount for PayFast: numeric only, exactly 2 decimal places, no currency symbols
     const payfastAmount = Number(serverTotal).toFixed(2);
-    console.log('[Checkout] PayFast amount (ZAR):', payfastAmount);
+
+    console.log('[Checkout] payfastAmount (ZAR):', payfastAmount);
 
     // Validate amount before proceeding
     if (!Number.isFinite(Number(payfastAmount)) || Number(payfastAmount) <= 0) {
