@@ -91,9 +91,12 @@ export async function POST(req: NextRequest) {
         .eq('status', 'published')
         .single();
 
-      if (!product) continue;
+      if (!product) {
+        console.error('[Checkout] Product not found:', item.productId, '- skipping');
+        continue;
+      }
 
-      const unitPrice = product.sale_price && product.sale_price < product.price ? product.sale_price : product.price;
+      const unitPrice = Number(product.sale_price && product.sale_price < product.price ? product.sale_price : product.price);
       const itemTotal = unitPrice * item.quantity;
       const itemShipping = (product.supplier_shipping_cost || 0) * item.quantity;
 
@@ -115,7 +118,26 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const serverTotal = serverSubtotal + serverShipping;
+    let serverTotal = Number(serverSubtotal) + Number(serverShipping);
+
+    // Validate serverTotal is a finite number greater than 0
+    if (!Number.isFinite(serverTotal) || serverTotal <= 0) {
+      console.error('[Checkout] Invalid serverTotal:', serverTotal, 'subtotal:', serverSubtotal, 'shipping:', serverShipping);
+      return NextResponse.json({ error: 'Unable to calculate order total. Please check your cart.' }, { status: 400 });
+    }
+
+    // Round to 2 decimal places
+    serverTotal = Math.round(serverTotal * 100) / 100;
+
+    // Format amount for PayFast: numeric only, exactly 2 decimal places, no currency symbols
+    const payfastAmount = Number(serverTotal).toFixed(2);
+    console.log('[Checkout] PayFast amount (ZAR):', payfastAmount);
+
+    // Validate amount before proceeding
+    if (!Number.isFinite(Number(payfastAmount)) || Number(payfastAmount) <= 0) {
+      console.error('[Checkout] PayFast amount validation failed:', payfastAmount);
+      return NextResponse.json({ error: 'Invalid payment amount calculated.' }, { status: 400 });
+    }
 
     // Calculate PayFast fee (3.5% + R2.00, min R5.00)
     const paymentFee = Math.max(5, serverTotal * 0.035 + 2);
@@ -169,7 +191,7 @@ export async function POST(req: NextRequest) {
       email_confirmation: '1',
       confirmation_address: customer.email,
       m_payment_id: order.id,
-      amount: serverTotal.toFixed(2),
+      amount: payfastAmount,
       item_name: `Everything Store - Order #${order.order_number}`,
       item_description: `Order #${order.order_number} (${orderItems.length} items)`,
       name_first: customer.name.split(' ')[0] || customer.name,
