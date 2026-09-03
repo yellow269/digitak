@@ -189,7 +189,7 @@ export function ProductForm({
     const supabase = createClient();
     const payload = {
       name: form.name,
-      slug: form.slug,
+      slug: slugify(form.slug),
       short_description: form.short_description || null,
       description: form.description || null,
       benefits: form.benefits,
@@ -284,7 +284,7 @@ export function ProductForm({
               <Input
                 id="slug"
                 value={form.slug}
-                onChange={(e) => update('slug', e.target.value)}
+                onChange={(e) => update('slug', slugify(e.target.value))}
                 required
               />
             </div>
