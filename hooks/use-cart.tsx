@@ -49,13 +49,17 @@ function saveCart(items: CartItem[]) {
 type CartContextType = {
   cart: Cart;
   addItem: (item: Omit<CartItem, 'quantity'> & { quantity?: number }) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  removeItem: (itemKey: string) => void;
+  updateQuantity: (itemKey: string, quantity: number) => void;
   clearCart: () => void;
   itemCount: number;
 };
 
 const CartContext = createContext<CartContextType | null>(null);
+
+export function cartItemKey(item: { productId: string; selected_colour?: { name: string } | null }): string {
+  return `${item.productId}:${item.selected_colour?.name || ''}`;
+}
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -72,11 +76,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addItem = useCallback((item: Omit<CartItem, 'quantity'> & { quantity?: number }) => {
     const qty = item.quantity || 1;
+    const key = cartItemKey(item);
     setItems((prev) => {
-      const existing = prev.find((i) => i.productId === item.productId);
+      const existing = prev.find((i) => cartItemKey(i) === key);
       if (existing) {
         return prev.map((i) =>
-          i.productId === item.productId
+          cartItemKey(i) === key
             ? { ...i, quantity: Math.min(i.quantity + qty, 99) }
             : i
         );
@@ -85,15 +90,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const removeItem = useCallback((productId: string) => {
-    setItems((prev) => prev.filter((i) => i.productId !== productId));
+  const removeItem = useCallback((key: string) => {
+    setItems((prev) => prev.filter((i) => cartItemKey(i) !== key));
   }, []);
 
-  const updateQuantity = useCallback((productId: string, quantity: number) => {
+  const updateQuantity = useCallback((key: string, quantity: number) => {
     if (quantity < 1) return;
     setItems((prev) =>
       prev.map((i) =>
-        i.productId === productId ? { ...i, quantity: Math.min(quantity, 99) } : i
+        cartItemKey(i) === key ? { ...i, quantity: Math.min(quantity, 99) } : i
       )
     );
   }, []);

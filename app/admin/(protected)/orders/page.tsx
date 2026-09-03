@@ -248,6 +248,15 @@ function OrderItemsList({ orderId }: { orderId: string }) {
           </div>
           <div className="flex-1">
             <p className="text-sm font-medium">{item.product_name}</p>
+            {item.selected_colour && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full border border-slate-300"
+                  style={{ backgroundColor: item.selected_colour.hex }}
+                />
+                <span className="text-xs text-slate-500">{item.selected_colour.name}</span>
+              </div>
+            )}
             <p className="text-xs text-slate-500">Qty: {item.quantity} x {formatPrice(item.unit_price, 'ZAR')}</p>
           </div>
           <div className="text-right">

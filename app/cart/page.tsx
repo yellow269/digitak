@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useCart } from '@/hooks/use-cart';
+import { useCart, cartItemKey } from '@/hooks/use-cart';
 import { formatPrice } from '@/lib/format';
 
 export default function CartPage() {
@@ -35,9 +35,10 @@ export default function CartPage() {
           {cart.items.map((item) => {
             const price = item.sale_price && item.sale_price < item.price ? item.sale_price : item.price;
             const lineTotal = price * item.quantity;
+            const key = cartItemKey(item);
 
             return (
-              <Card key={item.productId}>
+              <Card key={key}>
                 <CardContent className="flex gap-4 p-4">
                   <div className="h-24 w-24 shrink-0 overflow-hidden rounded-md bg-slate-100">
                     {item.image_url ? (
@@ -58,6 +59,15 @@ export default function CartPage() {
                         >
                           {item.name}
                         </Link>
+                        {item.selected_colour && (
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span
+                              className="inline-block h-3 w-3 rounded-full border border-slate-300"
+                              style={{ backgroundColor: item.selected_colour.hex }}
+                            />
+                            <span className="text-xs text-slate-500">{item.selected_colour.name}</span>
+                          </div>
+                        )}
                         {item.shipping_estimate && (
                           <p className="text-xs text-slate-500 mt-0.5">{item.shipping_estimate}</p>
                         )}
@@ -65,7 +75,7 @@ export default function CartPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => removeItem(item.productId)}
+                        onClick={() => removeItem(key)}
                         className="text-slate-400 hover:text-red-500 h-8 w-8"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -74,7 +84,7 @@ export default function CartPage() {
                     <div className="mt-auto flex items-center justify-between pt-2">
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                          onClick={() => updateQuantity(key, item.quantity - 1)}
                           disabled={item.quantity <= 1}
                           className="rounded-md border p-1.5 hover:bg-slate-50 disabled:opacity-50"
                         >
@@ -82,7 +92,7 @@ export default function CartPage() {
                         </button>
                         <span className="w-10 text-center text-sm font-medium">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                          onClick={() => updateQuantity(key, item.quantity + 1)}
                           className="rounded-md border p-1.5 hover:bg-slate-50"
                         >
                           <Plus className="h-3 w-3" />

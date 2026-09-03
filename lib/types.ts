@@ -13,6 +13,11 @@ export type Category = {
 export type ProductType = 'affiliate' | 'dropshipping' | 'digital' | 'manual';
 export type StockStatus = 'in_stock' | 'out_of_stock' | 'low_stock' | 'pre_order';
 
+export type ColourOption = {
+  name: string;
+  hex: string;
+};
+
 export type Product = {
   id: string;
   name: string;
@@ -49,8 +54,10 @@ export type Product = {
   stock_status?: StockStatus;
   shipping_estimate?: string | null;
   supplier_url?: string | null;
+  supplier_notes?: string | null;
   sale_price?: number | null;
   quantity_available?: number;
+  colours?: ColourOption[];
   
   // Joined relation
   supplier?: Supplier | null;
@@ -213,6 +220,7 @@ export type OrderItem = {
   estimated_profit: number | null;
   fulfillment_status: FulfillmentStatus;
   supplier_notes: string | null;
+  selected_colour: ColourOption | null;
   created_at: string;
   product?: Product;
   supplier?: Supplier;
@@ -233,6 +241,7 @@ export type CartItem = {
   shipping_estimate?: string | null;
   supplier_shipping_cost?: number | null;
   stock_status?: StockStatus;
+  selected_colour?: ColourOption | null;
 };
 
 export type Cart = {

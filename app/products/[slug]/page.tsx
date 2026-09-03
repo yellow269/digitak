@@ -12,6 +12,7 @@ import { formatPrice } from '@/lib/format';
 import { AFFILIATE_DISCLOSURE_SHORT, SITE_NAME } from '@/lib/constants';
 import type { Product } from '@/lib/types';
 import { AddToCartButton } from '@/components/add-to-cart-button';
+import { ProductActions } from '@/components/product-actions';
 
 export const revalidate = 3600;
 
@@ -237,7 +238,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
           {/* CTA */}
           <div className="mt-6 flex flex-col gap-3">
-            <AddToCartButton product={product} isAffiliate={isAffiliate} />
+            <ProductActions product={product} isAffiliate={isAffiliate} />
             {isAffiliate && (
               <p className="text-xs text-slate-500">
                 You will be redirected to the vendor&apos;s page. {AFFILIATE_DISCLOSURE_SHORT}

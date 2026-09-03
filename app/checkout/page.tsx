@@ -71,6 +71,7 @@ export default function CheckoutPage() {
             quantity: item.quantity,
             product_type: item.product_type,
             supplier_shipping_cost: item.supplier_shipping_cost || 0,
+            selected_colour: item.selected_colour || null,
           })),
           customer: form,
           subtotal: cart.subtotal,

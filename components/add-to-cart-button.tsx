@@ -5,9 +5,9 @@ import { ShoppingCart, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/use-cart';
 import { toast } from 'sonner';
-import type { Product } from '@/lib/types';
+import type { Product, ColourOption } from '@/lib/types';
 
-export function AddToCartButton({ product, isAffiliate }: { product: Product; isAffiliate: boolean }) {
+export function AddToCartButton({ product, isAffiliate, selectedColour }: { product: Product; isAffiliate: boolean; selectedColour?: ColourOption | null }) {
   const { addItem } = useCart();
   const displayPrice = product.selling_price || product.price;
 
@@ -37,8 +37,10 @@ export function AddToCartButton({ product, isAffiliate }: { product: Product; is
       shipping_estimate: product.shipping_estimate,
       supplier_shipping_cost: product.supplier_shipping_cost,
       stock_status: product.stock_status,
+      selected_colour: selectedColour || null,
     });
-    toast.success(`${product.name} added to cart`);
+    const colourLabel = selectedColour ? ` (${selectedColour.name})` : '';
+    toast.success(`${product.name}${colourLabel} added to cart`);
   }
 
   function handleBuyNow() {

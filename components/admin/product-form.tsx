@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Save, Trash2, Star, Plus, X, Calculator } from 'lucide-react';
+import { Loader2, Save, Trash2, Star, Plus, X, Calculator, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
 import { slugify, formatPrice } from '@/lib/format';
 import { PRODUCT_TYPES, STOCK_STATUSES } from '@/lib/constants';
-import type { Category, Supplier, ProductType, StockStatus } from '@/lib/types';
+import type { Category, Supplier, ProductType, StockStatus, ColourOption } from '@/lib/types';
 
 type ProductFormData = {
   name: string;
@@ -45,7 +45,9 @@ type ProductFormData = {
   stock_status: StockStatus;
   shipping_estimate: string;
   supplier_url: string;
+  supplier_notes: string;
   quantity_available: string;
+  colours: ColourOption[];
 };
 
 const EMPTY: ProductFormData = {
@@ -78,7 +80,9 @@ const EMPTY: ProductFormData = {
   stock_status: 'in_stock',
   shipping_estimate: '',
   supplier_url: '',
+  supplier_notes: '',
   quantity_available: '0',
+  colours: [],
 };
 
 export function ProductForm({
@@ -97,6 +101,8 @@ export function ProductForm({
   const [benefitInput, setBenefitInput] = useState('');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [priceOverride, setPriceOverride] = useState(false);
+  const [newColourName, setNewColourName] = useState('');
+  const [newColourHex, setNewColourHex] = useState('#000000');
 
   useEffect(() => {
     if (initialData) {
@@ -149,6 +155,19 @@ export function ProductForm({
     update('benefits', form.benefits.filter((_, idx) => idx !== i));
   }
 
+  function addColour() {
+    const name = newColourName.trim();
+    if (!name) return;
+    if (form.colours.some((c) => c.name.toLowerCase() === name.toLowerCase())) return;
+    update('colours', [...form.colours, { name, hex: newColourHex }]);
+    setNewColourName('');
+    setNewColourHex('#000000');
+  }
+
+  function removeColour(i: number) {
+    update('colours', form.colours.filter((_, idx) => idx !== i));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -199,7 +218,9 @@ export function ProductForm({
       stock_status: form.stock_status,
       shipping_estimate: form.shipping_estimate || null,
       supplier_url: form.supplier_url || null,
+      supplier_notes: form.supplier_notes || null,
       quantity_available: parseInt(form.quantity_available, 10) || 0,
+      colours: form.colours.length > 0 ? form.colours : [],
     };
 
     let result;
@@ -362,9 +383,15 @@ export function ProductForm({
       {/* Supplier Information (for dropshipping) */}
       {(form.product_type === 'dropshipping') && (
         <Card>
-          <CardHeader>
-            <CardTitle>Supplier Information</CardTitle>
-          </CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Supplier Information
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+              <Truck className="h-3 w-3" />
+              Dropshipping
+            </span>
+          </CardTitle>
+        </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -389,8 +416,8 @@ export function ProductForm({
               <Input value={form.supplier_url} onChange={(e) => update('supplier_url', e.target.value)} placeholder="https://..." />
             </div>
             <div>
-              <Label>Notes (Fulfillment instructions for this supplier)</Label>
-              <Textarea value={form.supplier_sku} onChange={(e) => update('supplier_sku', e.target.value)} rows={2} />
+              <Label>Supplier Notes (Fulfillment instructions)</Label>
+              <Textarea value={form.supplier_notes} onChange={(e) => update('supplier_notes', e.target.value)} rows={2} placeholder="e.g. Deliver within 3 days, handle with care..." />
             </div>
           </CardContent>
         </Card>
@@ -591,6 +618,58 @@ export function ProductForm({
           <ImageUpload
             onUploaded={(url) => update('image_url', url)}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Colour Options</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-slate-500">
+            Add available colour options for this product. Customers will see colour swatches on the product page.
+          </p>
+          {form.colours.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {form.colours.map((colour, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5">
+                  <span
+                    className="inline-block h-4 w-4 rounded-full border border-slate-300"
+                    style={{ backgroundColor: colour.hex }}
+                  />
+                  <span className="text-sm font-medium text-slate-700">{colour.name}</span>
+                  <span className="text-xs text-slate-400">{colour.hex}</span>
+                  <button type="button" onClick={() => removeColour(i)} className="ml-1 text-slate-400 hover:text-red-500">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <Label>Colour Name</Label>
+              <Input
+                value={newColourName}
+                onChange={(e) => setNewColourName(e.target.value)}
+                placeholder="e.g. Black"
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addColour(); } }}
+              />
+            </div>
+            <div className="w-20">
+              <Label>Hex</Label>
+              <input
+                type="color"
+                value={newColourHex}
+                onChange={(e) => setNewColourHex(e.target.value)}
+                className="h-10 w-full cursor-pointer rounded-md border border-slate-200"
+              />
+            </div>
+            <Button type="button" variant="outline" onClick={addColour} className="gap-1 shrink-0">
+              <Plus className="h-4 w-4" />
+              Add
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

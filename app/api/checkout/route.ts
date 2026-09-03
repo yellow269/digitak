@@ -14,6 +14,7 @@ interface CheckoutItem {
   quantity: number;
   product_type: string;
   supplier_shipping_cost: number;
+  selected_colour?: { name: string; hex: string } | null;
 }
 
 interface CheckoutPayload {
@@ -130,6 +131,7 @@ export async function POST(req: NextRequest) {
       supplier_cost: number | null;
       supplier_shipping_cost: number | null;
       estimated_profit: number | null;
+      selected_colour: { name: string; hex: string } | null;
     }[] = [];
 
     for (const item of items) {
@@ -190,6 +192,7 @@ export async function POST(req: NextRequest) {
         supplier_cost: product.supplier_cost,
         supplier_shipping_cost: product.supplier_shipping_cost,
         estimated_profit: product.estimated_profit,
+        selected_colour: item.selected_colour || null,
       });
     }
 
