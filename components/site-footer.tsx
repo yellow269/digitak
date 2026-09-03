@@ -15,6 +15,7 @@ const FOOTER_LINKS = [
   {
     title: 'Company',
     links: [
+      { href: '/track', label: 'Track Order' },
       { href: '/about', label: 'About Us' },
       { href: '/contact', label: 'Contact' },
       { href: '/blog', label: 'Blog' },

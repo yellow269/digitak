@@ -197,6 +197,8 @@ export type Order = {
   total: number;
   payment_fee: number;
   tracking_number: string | null;
+  courier_name: string | null;
+  tracking_url: string | null;
   supplier_notes: string | null;
   notes: string | null;
   created_at: string;

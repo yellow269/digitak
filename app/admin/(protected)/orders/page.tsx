@@ -2,17 +2,32 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Eye, Loader2, Package, Truck, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Eye, Loader2, Package, Truck, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
 import { formatPrice, formatDate } from '@/lib/format';
 import { ORDER_STATUSES } from '@/lib/constants';
 import type { Order, OrderItem, OrderStatus } from '@/lib/types';
+
+const COURIERS = [
+  'The Courier Guy',
+  'Fastway',
+  'DHL',
+  'Aramex',
+  'Bob Go',
+  'Kerry Logistics',
+  'Pargo',
+  'Pep Store',
+  'Arashi Connect',
+  'Internet Express',
+  '_own courier_',
+];
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -20,11 +35,25 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updating, setUpdating] = useState(false);
+  const [trackingCourier, setTrackingCourier] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [trackingUrl, setTrackingUrl] = useState('');
+  const [customCourier, setCustomCourier] = useState('');
+  const [savingTracking, setSavingTracking] = useState(false);
 
   useEffect(() => {
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
+
+  useEffect(() => {
+    if (selectedOrder) {
+      setTrackingCourier(selectedOrder.courier_name || '');
+      setTrackingNumber(selectedOrder.tracking_number || '');
+      setTrackingUrl(selectedOrder.tracking_url || '');
+      setCustomCourier('');
+    }
+  }, [selectedOrder]);
 
   async function fetchOrders() {
     setLoading(true);
@@ -49,9 +78,26 @@ export default function OrdersPage() {
     }
   }
 
-  async function updateTrackingNumber(orderId: string, tracking: string) {
+  async function saveTrackingInfo() {
+    if (!selectedOrder) return;
+    setSavingTracking(true);
     const supabase = createClient();
-    await supabase.from('orders').update({ tracking_number: tracking }).eq('id', orderId);
+    const courier = trackingCourier === '_own courier_' ? customCourier : trackingCourier;
+    await supabase
+      .from('orders')
+      .update({
+        courier_name: courier || null,
+        tracking_number: trackingNumber || null,
+        tracking_url: trackingUrl || null,
+      })
+      .eq('id', selectedOrder.id);
+    setSelectedOrder({
+      ...selectedOrder,
+      courier_name: courier || null,
+      tracking_number: trackingNumber || null,
+      tracking_url: trackingUrl || null,
+    });
+    setSavingTracking(false);
     fetchOrders();
   }
 
@@ -112,6 +158,12 @@ export default function OrdersPage() {
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-slate-900">#{order.order_number}</span>
                     {getStatusBadge(order.status)}
+                    {order.tracking_number && (
+                      <Badge variant="outline" className="gap-1 text-xs">
+                        <Truck className="h-3 w-3" />
+                        {order.courier_name || 'Tracked'}
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm text-slate-500 truncate">{order.customer_name} - {order.customer_email}</p>
                 </div>
@@ -195,16 +247,72 @@ export default function OrdersPage() {
                   </div>
                 </div>
 
-                {/* Tracking */}
-                <div>
-                  <h3 className="text-sm font-medium text-slate-500 mb-2">Tracking Number</h3>
-                  <div className="flex gap-2">
+                {/* Tracking & Shipping */}
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-4">
+                  <h3 className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                    <Truck className="h-4 w-4" />
+                    Shipping &amp; Tracking
+                  </h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="courier">Courier</Label>
+                      <Select
+                        value={trackingCourier}
+                        onValueChange={setTrackingCourier}
+                      >
+                        <SelectTrigger id="courier">
+                          <SelectValue placeholder="Select courier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COURIERS.map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {trackingCourier === '_own courier_' && (
+                      <div>
+                        <Label htmlFor="custom_courier">Courier Name</Label>
+                        <Input
+                          id="custom_courier"
+                          value={customCourier}
+                          onChange={(e) => setCustomCourier(e.target.value)}
+                          placeholder="Enter courier name"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="tracking_number">Tracking Number</Label>
                     <Input
-                      defaultValue={selectedOrder.tracking_number || ''}
+                      id="tracking_number"
+                      value={trackingNumber}
+                      onChange={(e) => setTrackingNumber(e.target.value)}
                       placeholder="Enter tracking number"
-                      onBlur={(e) => updateTrackingNumber(selectedOrder.id, e.target.value)}
                     />
                   </div>
+                  <div>
+                    <Label htmlFor="tracking_url">Tracking URL</Label>
+                    <Input
+                      id="tracking_url"
+                      type="url"
+                      value={trackingUrl}
+                      onChange={(e) => setTrackingUrl(e.target.value)}
+                      placeholder="https://..."
+                    />
+                    <p className="mt-1 text-xs text-slate-400">
+                      Full tracking link the customer will use. If left blank, no &quot;Track Order&quot; link will be shown.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={saveTrackingInfo}
+                    disabled={savingTracking}
+                    className="gap-1"
+                  >
+                    {savingTracking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                    Save Tracking Info
+                  </Button>
                 </div>
               </div>
             </>

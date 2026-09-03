@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CheckCircle, ArrowRight } from 'lucide-react';
+import { CheckCircle, ArrowRight, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -21,6 +21,12 @@ export default function CheckoutSuccessPage({
               Thank you for your purchase. Your order has been received and is being processed.
             </p>
             <div className="mt-6 flex flex-col gap-3">
+              <Button asChild>
+                <Link href="/track" className="gap-1">
+                  <Truck className="h-4 w-4" />
+                  Track Your Order
+                </Link>
+              </Button>
               <Button asChild>
                 <Link href="/products" className="gap-1">
                   Continue Shopping
