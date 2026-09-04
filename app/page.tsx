@@ -34,7 +34,7 @@ async function getHomeData() {
       .eq('status', 'published')
       .order('created_at', { ascending: false })
       .limit(4),
-    supabase.from('categories').select('*').order('sort_order', { ascending: true }).limit(14),
+    supabase.from('categories').select('*').is('parent_id', null).order('sort_order', { ascending: true }).limit(16),
     supabase
       .from('products')
       .select('category:categories!inner(id,name,slug)')

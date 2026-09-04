@@ -221,11 +221,13 @@ function FilterPanel({
   onCategoryChange: (v: string) => void;
   onPriceChange: (v: string) => void;
 }) {
+  const parents = categories.filter((c) => !c.parent_id).sort((a, b) => a.sort_order - b.sort_order);
+
   return (
     <div className="space-y-6">
       <div>
         <h3 className="mb-3 text-sm font-semibold text-slate-900">Category</h3>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <button
             onClick={() => onCategoryChange('all')}
             className={`block w-full rounded-md px-3 py-1.5 text-left text-sm transition-colors ${
@@ -234,17 +236,34 @@ function FilterPanel({
           >
             All categories
           </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => onCategoryChange(cat.slug)}
-              className={`block w-full rounded-md px-3 py-1.5 text-left text-sm transition-colors ${
-                category === cat.slug ? 'bg-sky-50 text-sky-700 font-medium' : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
+          {parents.map((parent) => {
+            const children = categories
+              .filter((c) => c.parent_id === parent.id)
+              .sort((a, b) => a.sort_order - b.sort_order);
+            return (
+              <div key={parent.id}>
+                <button
+                  onClick={() => onCategoryChange(parent.slug)}
+                  className={`block w-full rounded-md px-3 py-1.5 text-left text-sm font-medium transition-colors ${
+                    category === parent.slug ? 'bg-sky-50 text-sky-700' : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {parent.name}
+                </button>
+                {children.map((child) => (
+                  <button
+                    key={child.id}
+                    onClick={() => onCategoryChange(child.slug)}
+                    className={`block w-full rounded-md pl-6 pr-3 py-1 text-left text-xs transition-colors ${
+                      category === child.slug ? 'bg-sky-50 text-sky-700 font-medium' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                    }`}
+                  >
+                    {child.name}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
         </div>
       </div>
 

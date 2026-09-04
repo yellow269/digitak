@@ -14,6 +14,7 @@ import { createClient } from '@/lib/supabase/client';
 import { slugify, formatPrice } from '@/lib/format';
 import { PRODUCT_TYPES, STOCK_STATUSES } from '@/lib/constants';
 import type { Category, Supplier, ProductType, StockStatus, ColourOption, ProductOption, ProductOptionValue } from '@/lib/types';
+import { CategorySelect } from '@/components/admin/category-select';
 
 type ProductFormData = {
   name: string;
@@ -340,20 +341,11 @@ export function ProductForm({
             </div>
             <div>
               <Label htmlFor="category_id">Category</Label>
-              <Select
-                value={form.category_id || 'none'}
-                onValueChange={(v) => update('category_id', v === 'none' ? '' : v)}
-              >
-                <SelectTrigger id="category_id">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No category</SelectItem>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CategorySelect
+                categories={categories}
+                value={form.category_id}
+                onChange={(v) => update('category_id', v)}
+              />
             </div>
           </div>
 

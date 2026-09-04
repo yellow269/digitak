@@ -7,6 +7,7 @@ export type Category = {
   seo_title: string | null;
   seo_description: string | null;
   sort_order: number;
+  parent_id: string | null;
   created_at: string;
 };
 

@@ -1,30 +1,44 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Save, Trash2, Plus, Pencil, X } from 'lucide-react';
+import { Loader2, Save, Trash2, Plus, Pencil, X, ChevronRight, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
 import { slugify } from '@/lib/format';
 import type { Category } from '@/lib/types';
+
+function buildTree(categories: Category[]): Category[] {
+  const parents = categories.filter((c) => !c.parent_id).sort((a, b) => a.sort_order - b.sort_order);
+  return parents;
+}
+
+function getChildren(categories: Category[], parentId: string): Category[] {
+  return categories.filter((c) => c.parent_id === parentId).sort((a, b) => a.sort_order - b.sort_order);
+}
 
 export function CategoryManager({ categories }: { categories: Category[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState<Category | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [list, setList] = useState(categories);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [showFormParentId, setShowFormParentId] = useState<string | null>(null);
 
-  function startNew() {
+  function startNew(parentId?: string) {
     setEditing(null);
+    setShowFormParentId(parentId || null);
     setShowForm(true);
   }
 
   function startEdit(cat: Category) {
     setEditing(cat);
+    setShowFormParentId(cat.parent_id || null);
     setShowForm(true);
   }
 
@@ -36,25 +50,37 @@ export function CategoryManager({ categories }: { categories: Category[] }) {
     }
     setShowForm(false);
     setEditing(null);
+    setShowFormParentId(null);
     router.refresh();
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this category? Products in it will keep their data but lose the category link.')) return;
+    if (!confirm('Delete this category? Products in it will keep their data but lose the category link. Subcategories will also be deleted.')) return;
     const supabase = createClient();
     await supabase.from('categories').delete().eq('id', id);
-    setList((prev) => prev.filter((c) => c.id !== id));
+    setList((prev) => prev.filter((c) => c.id !== id && c.parent_id !== id));
     router.refresh();
   }
+
+  function toggleExpand(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const parents = buildTree(list);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Categories</h1>
-          <p className="text-sm text-slate-500">{list.length} categories</p>
+          <p className="text-sm text-slate-500">{list.length} categories ({parents.length} top-level)</p>
         </div>
-        <Button onClick={startNew} className="gap-1">
+        <Button onClick={() => startNew()} className="gap-1">
           <Plus className="h-4 w-4" />
           Add Category
         </Button>
@@ -64,37 +90,54 @@ export function CategoryManager({ categories }: { categories: Category[] }) {
         <CategoryForm
           key={editing?.id || 'new'}
           initial={editing}
+          parentId={showFormParentId}
+          categories={list}
           onSaved={onSaved}
-          onCancel={() => { setShowForm(false); setEditing(null); }}
+          onCancel={() => { setShowForm(false); setEditing(null); setShowFormParentId(null); }}
         />
       )}
 
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Slug</th>
-              <th className="px-4 py-3">Sort Order</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {list.map((cat) => (
-              <tr key={cat.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 font-medium text-slate-900">{cat.name}</td>
-                <td className="px-4 py-3 text-slate-600">{cat.slug}</td>
-                <td className="px-4 py-3 text-slate-600">{cat.sort_order}</td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => startEdit(cat)}><Pencil className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(cat.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-1">
+        {parents.map((parent) => {
+          const children = getChildren(list, parent.id);
+          const isExpanded = expanded.has(parent.id);
+          return (
+            <div key={parent.id}>
+              <div className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-slate-50 group">
+                {children.length > 0 ? (
+                  <button onClick={() => toggleExpand(parent.id)} className="text-slate-400 hover:text-slate-600">
+                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </button>
+                ) : (
+                  <span className="w-4" />
+                )}
+                <span className="font-medium text-slate-900 flex-1">{parent.name}</span>
+                <span className="text-xs text-slate-400 mr-2">{parent.slug}</span>
+                {children.length > 0 && (
+                  <span className="text-xs text-slate-400 mr-2">{children.length} sub</span>
+                )}
+                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100" onClick={() => startNew(parent.id)} title="Add subcategory">
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100" onClick={() => startEdit(parent)}><Pencil className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100" onClick={() => handleDelete(parent.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+              </div>
+              {isExpanded && children.length > 0 && (
+                <div className="ml-6 space-y-0.5">
+                  {children.map((child) => (
+                    <div key={child.id} className="flex items-center gap-2 rounded-md px-3 py-1.5 hover:bg-slate-50 group">
+                      <span className="w-4" />
+                      <span className="text-sm text-slate-700 flex-1">{child.name}</span>
+                      <span className="text-xs text-slate-400 mr-2">{child.slug}</span>
+                      <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 h-7 w-7" onClick={() => startEdit(child)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 h-7 w-7" onClick={() => handleDelete(child.id)}><Trash2 className="h-3.5 w-3.5 text-red-500" /></Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -102,10 +145,14 @@ export function CategoryManager({ categories }: { categories: Category[] }) {
 
 function CategoryForm({
   initial,
+  parentId,
+  categories,
   onSaved,
   onCancel,
 }: {
   initial: Category | null;
+  parentId: string | null;
+  categories: Category[];
   onSaved: (cat: Category, isNew: boolean) => void;
   onCancel: () => void;
 }) {
@@ -116,8 +163,11 @@ function CategoryForm({
   const [seoTitle, setSeoTitle] = useState(initial?.seo_title || '');
   const [seoDescription, setSeoDescription] = useState(initial?.seo_description || '');
   const [sortOrder, setSortOrder] = useState(String(initial?.sort_order ?? 0));
+  const [catParentId, setCatParentId] = useState(initial?.parent_id || parentId || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const parents = categories.filter((c) => !c.parent_id).sort((a, b) => a.sort_order - b.sort_order);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -137,6 +187,7 @@ function CategoryForm({
       seo_title: seoTitle || null,
       seo_description: seoDescription || null,
       sort_order: parseInt(sortOrder, 10) || 0,
+      parent_id: catParentId || null,
     };
     let result;
     if (initial) {
@@ -170,8 +221,20 @@ function CategoryForm({
             </div>
             <div>
               <Label htmlFor="cat-slug">Slug *</Label>
-              <Input id="cat-slug" value={slug} onChange={(e) => setSlug(e.target.value)} required />
+              <Input id="cat-slug" value={slug} onChange={(e) => setSlug(slugify(e.target.value))} required />
             </div>
+          </div>
+          <div>
+            <Label htmlFor="cat-parent">Parent Category</Label>
+            <Select value={catParentId || 'none'} onValueChange={(v) => setCatParentId(v === 'none' ? '' : v)}>
+              <SelectTrigger id="cat-parent"><SelectValue placeholder="None (top-level)" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None (top-level)</SelectItem>
+                {parents.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label htmlFor="cat-desc">Description</Label>
