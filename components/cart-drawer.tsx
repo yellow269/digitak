@@ -5,7 +5,7 @@ import { ShoppingCart, X, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
-import { useCart } from '@/hooks/use-cart';
+import { useCart, cartItemKey } from '@/hooks/use-cart';
 import { formatPrice } from '@/lib/format';
 import { useState } from 'react';
 
@@ -47,7 +47,7 @@ export function CartDrawer() {
                 {cart.items.map((item) => {
                   const price = item.sale_price && item.sale_price < item.price ? item.sale_price : item.price;
                   return (
-                    <div key={item.productId} className="flex gap-4 py-4">
+                    <div key={cartItemKey(item)} className="flex gap-4 py-4">
                       <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-slate-100">
                         {item.image_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -69,7 +69,7 @@ export function CartDrawer() {
                         <p className="text-sm text-slate-500">{formatPrice(price, 'ZAR')}</p>
                         <div className="mt-auto flex items-center gap-2">
                           <button
-                            onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                            onClick={() => updateQuantity(cartItemKey(item), item.quantity - 1)}
                             disabled={item.quantity <= 1}
                             className="rounded-md border p-1 hover:bg-slate-50 disabled:opacity-50"
                           >
@@ -77,13 +77,13 @@ export function CartDrawer() {
                           </button>
                           <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
                           <button
-                            onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                            onClick={() => updateQuantity(cartItemKey(item), item.quantity + 1)}
                             className="rounded-md border p-1 hover:bg-slate-50"
                           >
                             <Plus className="h-3 w-3" />
                           </button>
                           <button
-                            onClick={() => removeItem(item.productId)}
+                            onClick={() => removeItem(cartItemKey(item))}
                             className="ml-auto text-slate-400 hover:text-red-500"
                           >
                             <X className="h-4 w-4" />
