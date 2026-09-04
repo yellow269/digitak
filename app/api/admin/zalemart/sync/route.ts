@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/server';
 import {
   ZALEMART_FEED_URL,
   ZALEMART_BASE_URL,
@@ -31,7 +31,7 @@ async function fetchFeed(): Promise<string> {
   return res.text();
 }
 
-async function getCategoryMap(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>): Promise<Record<string, string>> {
+async function getCategoryMap(supabase: ReturnType<typeof createServiceRoleClient>): Promise<Record<string, string>> {
   const { data: cats } = await supabase.from('categories').select('id, slug');
   const map: Record<string, string> = {};
   for (const c of cats || []) {
@@ -40,7 +40,7 @@ async function getCategoryMap(supabase: Awaited<ReturnType<typeof createServerSu
   return map;
 }
 
-async function getZalemartSupplierId(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>): Promise<string> {
+async function getZalemartSupplierId(supabase: ReturnType<typeof createServiceRoleClient>): Promise<string> {
   const { data } = await supabase
     .from('suppliers')
     .select('id')
@@ -51,7 +51,7 @@ async function getZalemartSupplierId(supabase: Awaited<ReturnType<typeof createS
 }
 
 async function getExistingProducts(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  supabase: ReturnType<typeof createServiceRoleClient>,
   supplierId: string
 ): Promise<Map<string, { id: string; supplier_handle: string; auto_repricing: boolean; selling_price: number | null; markup_percentage: number | null }>> {
   const { data } = await supabase
@@ -144,7 +144,7 @@ function stripHtmlSimple(html: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServiceRoleClient();
 
     const body = await req.json().catch(() => ({}));
     const mode = body.mode || 'sync';
@@ -289,7 +289,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = createServiceRoleClient();
 
     // Get latest sync logs (table may not exist yet)
     let logs: unknown[] = [];
