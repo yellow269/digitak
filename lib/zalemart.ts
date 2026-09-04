@@ -5,7 +5,6 @@ export const ZALEMART_FEED_URL =
 
 export const ZALEMART_BASE_URL = 'https://www.zalemart.co.za/products';
 
-// Map Zalemart product types to our category slugs
 const TYPE_TO_CATEGORY: Record<string, string> = {
   dress: 'dresses',
   dresses: 'dresses',
@@ -54,43 +53,72 @@ export type ZalemartProduct = {
   options: ProductOption[];
 };
 
-function parseCsvLine(line: string): string[] {
+/**
+ * RFC 4180 compliant CSV parser that correctly handles:
+ * - Quoted fields containing newlines (multiline descriptions)
+ * - Escaped quotes ("")
+ * - Commas inside quoted fields
+ */
+function parseCsvRows(csvText: string): string[][] {
+  const rows: string[][] = [];
   const fields: string[] = [];
   let current = '';
   let inQuotes = false;
+  let i = 0;
 
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
+  while (i < csvText.length) {
+    const ch = csvText[i];
+
     if (inQuotes) {
       if (ch === '"') {
-        if (i + 1 < line.length && line[i + 1] === '"') {
+        if (i + 1 < csvText.length && csvText[i + 1] === '"') {
+          // Escaped quote
           current += '"';
-          i++;
+          i += 2;
         } else {
+          // End of quoted field
           inQuotes = false;
+          i++;
         }
       } else {
         current += ch;
+        i++;
       }
     } else {
       if (ch === '"') {
         inQuotes = true;
+        i++;
       } else if (ch === ',') {
         fields.push(current);
         current = '';
+        i++;
+      } else if (ch === '\r') {
+        // Skip \r, handle \r\n
+        i++;
+      } else if (ch === '\n') {
+        // End of row
+        fields.push(current);
+        current = '';
+        // Skip empty trailing lines
+        if (fields.length > 1 || fields[0] !== '') {
+          rows.push(fields);
+        }
+        fields.length = 0;
+        i++;
       } else {
         current += ch;
+        i++;
       }
     }
   }
-  fields.push(current);
-  return fields;
-}
 
-function safeNum(v: string | undefined): number {
-  if (!v || v.trim() === '') return 0;
-  const n = parseFloat(v.replace(/[^\d.\-]/g, ''));
-  return isNaN(n) ? 0 : n;
+  // Push last field and row
+  fields.push(current);
+  if (fields.length > 1 || fields[0] !== '') {
+    rows.push(fields);
+  }
+
+  return rows;
 }
 
 function stripHtml(html: string): string {
@@ -104,45 +132,94 @@ function stripHtml(html: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
     .replace(/&#[0-9]+;/g, '')
+    .replace(/\u00a0/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
+function cleanTitle(raw: string): string {
+  return stripHtml(raw);
+}
+
+function safeNum(v: string | undefined): number {
+  if (!v || v.trim() === '') return 0;
+  const n = parseFloat(v.replace(/[^\d.\-]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+/**
+ * Parse Zalemart's Google Sheet CSV feed.
+ *
+ * Column layout (verified against actual feed data):
+ *  [0]  Title
+ *  [1]  URL Handle
+ *  [2]  Description (HTML, may contain newlines inside quotes)
+ *  [3]  Vendor
+ *  [4]  Product Category (empty in practice)
+ *  [5]  Type (product type: Pants, Dress, etc.)
+ *  [6]  Tags
+ *  [7]  Published on online store
+ *  [8]  Status
+ *  [9]  Type (duplicate header — this is the VARIANT SKU)
+ *  [10] Barcode
+ *  [11] Option 1 name
+ *  [12] Option 1 value
+ *  [13] (empty separator)
+ *  [14] Option 2 name
+ *  [15] Option 2 value
+ *  [16] (empty separator)
+ *  [17] Option 3 name
+ *  [18] Option 3 value
+ *  [19] (empty separator)
+ *  [20] Price
+ *  [21] Compare-at price
+ *  [22] Cost per item
+ *  [23] Inventory Quantity
+ *  [24] Weight value (grams)
+ *  [25] Weight unit for display
+ *  [26] (empty separator)
+ *  [27] Product Image
+ */
 export function parseZalemartCsv(csvText: string): ZalemartProduct[] {
-  const lines = csvText.split('\n');
-  if (lines.length < 2) return [];
+  const allRows = parseCsvRows(csvText);
+  if (allRows.length < 2) return [];
+
+  // First row is headers — skip it
+  const dataRows = allRows.slice(1);
 
   const productMap = new Map<string, ZalemartProduct>();
 
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+  for (const row of dataRows) {
+    if (row.length < 25) continue;
 
-    const fields = parseCsvLine(line);
-    if (fields.length < 23) continue;
+    const title = cleanTitle(row[0] || '');
+    const handle = (row[1] || '').trim();
+    const description = row[2] || '';
+    const vendor = (row[3] || '').trim();
+    const productType = (row[5] || '').trim();
+    const tags = (row[6] || '').trim();
 
-    const title = fields[0]?.trim() || '';
-    const handle = fields[1]?.trim() || '';
-    const description = fields[2]?.trim() || '';
-    const vendor = fields[3]?.trim() || '';
-    const productType = fields[5]?.trim() || '';
-    const tags = fields[6]?.trim() || '';
-    // fields[9] is the duplicate "Type" column = SKU
-    const sku = fields[9]?.trim() || '';
-    const barcode = fields[10]?.trim() || null;
-    const option1Name = fields[11]?.trim() || null;
-    const option1Value = fields[12]?.trim() || null;
-    const option2Name = fields[14]?.trim() || null;
-    const option2Value = fields[15]?.trim() || null;
-    const option3Name = fields[17]?.trim() || null;
-    const option3Value = fields[18]?.trim() || null;
-    const price = safeNum(fields[20]);
-    const compareAtPrice = safeNum(fields[21]) || null;
-    const cost = safeNum(fields[22]);
-    const inventoryQuantity = Math.round(safeNum(fields[23]));
-    const weightGrams = safeNum(fields[24]) || null;
-    const imageUrl = fields[27]?.trim() || null;
+    // Column 9 = SKU (duplicate "Type" header in the feed)
+    const sku = (row[9] || '').trim();
+    const barcode = (row[10] || '').trim() || null;
+
+    const option1Name = (row[11] || '').trim() || null;
+    const option1Value = (row[12] || '').trim() || null;
+    const option2Name = (row[14] || '').trim() || null;
+    const option2Value = (row[15] || '').trim() || null;
+    const option3Name = (row[17] || '').trim() || null;
+    const option3Value = (row[18] || '').trim() || null;
+
+    const price = safeNum(row[20]);
+    const compareAtPrice = safeNum(row[21]) || null;
+    const cost = safeNum(row[22]);
+    // Clamp negative stock to 0 (Zalemart uses negative values for oversold items)
+    const rawStock = Math.round(safeNum(row[23]));
+    const inventoryQuantity = rawStock < 0 ? 0 : rawStock;
+    const weightGrams = safeNum(row[24]) || null;
+    const imageUrl = (row[27] || '').trim() || null;
 
     if (!handle || !title) continue;
 
@@ -167,9 +244,15 @@ export function parseZalemartCsv(csvText: string): ZalemartProduct[] {
       const existing = productMap.get(handle)!;
       existing.variants.push(variant);
       existing.totalStock += inventoryQuantity;
-      if (cost > 0 && (existing.minCost === 0 || cost < existing.minCost)) existing.minCost = cost;
-      if (cost > existing.maxCost) existing.maxCost = cost;
-      if (imageUrl && !existing.imageUrl) existing.imageUrl = imageUrl;
+      if (cost > 0 && (existing.minCost === 0 || cost < existing.minCost)) {
+        existing.minCost = cost;
+      }
+      if (cost > existing.maxCost) {
+        existing.maxCost = cost;
+      }
+      if (imageUrl && !existing.imageUrl) {
+        existing.imageUrl = imageUrl;
+      }
     } else {
       productMap.set(handle, {
         title,
