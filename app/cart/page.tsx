@@ -68,7 +68,7 @@ export default function CartPage() {
                             <span className="text-xs text-slate-500">{item.selected_colour.name}</span>
                           </div>
                         )}
-                        {item.selected_options && !item.selected_colour && (
+                        {item.selected_options && (
                           <p className="text-xs text-slate-500 mt-0.5">{formatOptionsLabel(item.selected_options)}</p>
                         )}
                         {item.shipping_estimate && (

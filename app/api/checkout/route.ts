@@ -16,6 +16,7 @@ interface CheckoutItem {
   supplier_shipping_cost: number;
   selected_colour?: { name: string; hex: string } | null;
   selected_options?: Record<string, { name: string; hex?: string }> | null;
+  variant_sku?: string | null;
 }
 
 interface CheckoutPayload {
@@ -134,6 +135,7 @@ export async function POST(req: NextRequest) {
       estimated_profit: number | null;
       selected_colour: { name: string; hex: string } | null;
       selected_options: Record<string, { name: string; hex?: string }> | null;
+      variant_sku: string | null;
     }[] = [];
 
     for (const item of items) {
@@ -196,6 +198,7 @@ export async function POST(req: NextRequest) {
         estimated_profit: product.estimated_profit,
         selected_colour: item.selected_colour || null,
         selected_options: item.selected_options || null,
+        variant_sku: item.variant_sku || null,
       });
     }
 

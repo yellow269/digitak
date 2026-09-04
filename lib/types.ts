@@ -31,6 +31,10 @@ export type ProductOption = {
 
 export type SelectedOptions = Record<string, ProductOptionValue>;
 
+export type VariantStock = Record<string, { stock: number; sku: string; price?: number }>;
+// Key format: "Type=Value:Type=Value" (sorted alphabetically)
+// e.g. "Colour=Blue:Size=M": { stock: 5, sku: "ABC-123" }
+
 export type Product = {
   id: string;
   name: string;
@@ -72,6 +76,7 @@ export type Product = {
   quantity_available?: number;
   colours?: ColourOption[];
   options?: ProductOption[];
+  variant_stock?: VariantStock;
   supplier_handle?: string | null;
   sync_enabled?: boolean;
   auto_repricing?: boolean;
@@ -242,6 +247,7 @@ export type OrderItem = {
   supplier_notes: string | null;
   selected_colour: ColourOption | null;
   selected_options: SelectedOptions | null;
+  variant_sku: string | null;
   created_at: string;
   product?: Product;
   supplier?: Supplier;
@@ -264,6 +270,7 @@ export type CartItem = {
   stock_status?: StockStatus;
   selected_colour?: ColourOption | null;
   selected_options?: SelectedOptions | null;
+  variant_sku?: string | null;
 };
 
 export type Cart = {

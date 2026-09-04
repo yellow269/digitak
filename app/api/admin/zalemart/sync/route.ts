@@ -6,6 +6,7 @@ import {
   parseZalemartCsv,
   mapZalemartTypeToCategoryId,
   calculateSellingPrice,
+  buildVariantStock,
   type ZalemartProduct,
 } from '@/lib/zalemart';
 import { slugify } from '@/lib/format';
@@ -105,6 +106,8 @@ function buildProductRow(
     ? stripHtmlSimple(description).slice(0, 500)
     : null;
 
+  const variantStock = buildVariantStock(product.variants);
+
   return {
     name: product.title,
     slug,
@@ -128,6 +131,7 @@ function buildProductRow(
     stock_status: stockStatus,
     quantity_available: product.totalStock,
     options: product.options.length > 0 ? product.options : undefined,
+    variant_stock: Object.keys(variantStock).length > 0 ? variantStock : undefined,
     sync_enabled: true,
     last_synced_at: new Date().toISOString(),
   };
@@ -237,6 +241,7 @@ export async function POST(req: NextRequest) {
             stock_status: row.stock_status,
             quantity_available: row.quantity_available,
             options: row.options,
+            variant_stock: row.variant_stock,
             last_synced_at: new Date().toISOString(),
           };
 

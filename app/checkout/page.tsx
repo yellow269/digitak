@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useCart } from '@/hooks/use-cart';
+import { useCart, formatOptionsLabel } from '@/hooks/use-cart';
 import { formatPrice } from '@/lib/format';
 import { SOUTH_AFRICAN_PROVINCES } from '@/lib/constants';
 import type { CheckoutFormData } from '@/lib/types';
@@ -73,6 +73,7 @@ export default function CheckoutPage() {
             supplier_shipping_cost: item.supplier_shipping_cost || 0,
             selected_colour: item.selected_colour || null,
             selected_options: item.selected_options || null,
+            variant_sku: item.variant_sku || null,
           })),
           customer: form,
           subtotal: cart.subtotal,
@@ -238,11 +239,15 @@ export default function CheckoutPage() {
                 <div className="max-h-60 overflow-y-auto divide-y">
                   {cart.items.map((item) => {
                     const price = item.sale_price && item.sale_price < item.price ? item.sale_price : item.price;
+                    const opts = formatOptionsLabel(item.selected_options);
                     return (
                       <div key={item.productId} className="flex justify-between py-2 text-sm">
-                        <span className="text-slate-600 line-clamp-1">
-                          {item.name} x{item.quantity}
-                        </span>
+                        <div className="line-clamp-1">
+                          <span className="text-slate-600">{item.name} x{item.quantity}</span>
+                          {opts && (
+                            <span className="text-xs text-slate-400 ml-1">({opts})</span>
+                          )}
+                        </div>
                         <span className="font-medium">{formatPrice(price * item.quantity, 'ZAR')}</span>
                       </div>
                     );

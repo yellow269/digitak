@@ -1,4 +1,4 @@
-import type { ProductOption, ProductOptionValue } from './types';
+import type { ProductOption, ProductOptionValue, VariantStock } from './types';
 
 export const ZALEMART_FEED_URL =
   'https://docs.google.com/spreadsheets/d/1RmUoY3_6-8O6jEtI83oml20dB43vxmOOXLrwNAn7lcs/export?format=csv';
@@ -315,4 +315,29 @@ export function calculateSellingPrice(
   const base = cost;
   const markup = base * (markupPercentage / 100) + markupAmount;
   return Math.round((base + markup) * 100) / 100;
+}
+
+/**
+ * Build a variant_stock map from Zalemart variant data.
+ * Key: "OptionType=Value:OptionType=Value" (sorted alphabetically)
+ * Value: { stock, sku, price }
+ */
+export function buildVariantStock(variants: ZalemartVariant[]): VariantStock {
+  const map: VariantStock = {};
+  for (const v of variants) {
+    const parts: string[] = [];
+    if (v.option1Name && v.option1Value) parts.push(`${v.option1Name}=${v.option1Value}`);
+    if (v.option2Name && v.option2Value) parts.push(`${v.option2Name}=${v.option2Value}`);
+    if (v.option3Name && v.option3Value) parts.push(`${v.option3Name}=${v.option3Value}`);
+
+    if (parts.length === 0) continue;
+
+    const key = parts.sort().join(':');
+    map[key] = {
+      stock: v.inventoryQuantity,
+      sku: v.sku,
+      price: v.price || undefined,
+    };
+  }
+  return map;
 }

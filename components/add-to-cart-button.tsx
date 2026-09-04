@@ -12,11 +12,15 @@ export function AddToCartButton({
   isAffiliate,
   selectedColour,
   selectedOptions,
+  variantSku,
+  disabled,
 }: {
   product: Product;
   isAffiliate: boolean;
   selectedColour?: ColourOption | null;
   selectedOptions?: SelectedOptions | null;
+  variantSku?: string | null;
+  disabled?: boolean;
 }) {
   const { addItem } = useCart();
   const displayPrice = product.selling_price || product.price;
@@ -55,6 +59,7 @@ export function AddToCartButton({
       stock_status: product.stock_status,
       selected_colour: selectedColour || null,
       selected_options: Object.keys(opts).length > 0 ? opts : null,
+      variant_sku: variantSku || null,
     });
 
     const optionLabel = Object.entries(opts)
@@ -69,23 +74,25 @@ export function AddToCartButton({
     window.location.href = '/checkout';
   }
 
+  const isOOS = product.stock_status === 'out_of_stock' || disabled;
+
   return (
     <div className="flex gap-2">
       <Button
         size="lg"
         className="flex-1 gap-2 text-base"
         onClick={handleAddToCart}
-        disabled={product.stock_status === 'out_of_stock'}
+        disabled={!!isOOS}
       >
         <ShoppingCart className="h-4 w-4" />
-        {product.stock_status === 'out_of_stock' ? 'Out of Stock' : 'Add to Cart'}
+        {isOOS ? 'Out of Stock' : 'Add to Cart'}
       </Button>
       <Button
         size="lg"
         variant="outline"
         className="text-base"
         onClick={handleBuyNow}
-        disabled={product.stock_status === 'out_of_stock'}
+        disabled={!!isOOS}
       >
         Buy Now
       </Button>
