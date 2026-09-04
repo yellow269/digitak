@@ -72,7 +72,11 @@ export type Product = {
   quantity_available?: number;
   colours?: ColourOption[];
   options?: ProductOption[];
-  
+  supplier_handle?: string | null;
+  sync_enabled?: boolean;
+  auto_repricing?: boolean;
+  last_synced_at?: string | null;
+
   // Joined relation
   supplier?: Supplier | null;
 };

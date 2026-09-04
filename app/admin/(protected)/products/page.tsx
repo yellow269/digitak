@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Plus, Pencil, ExternalLink, Upload } from 'lucide-react';
+import { Plus, Pencil, ExternalLink, Upload, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,12 @@ export default async function AdminProductsPage() {
             <Link href="/admin/products/import">
               <Upload className="h-4 w-4" />
               Import Product
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="gap-1">
+            <Link href="/admin/zalemart">
+              <RefreshCw className="h-4 w-4" />
+              Zalemart Sync
             </Link>
           </Button>
           <Button asChild className="gap-1">
