@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Plus, Pencil, ExternalLink } from 'lucide-react';
+import { Plus, Pencil, ExternalLink, Upload } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,12 +36,20 @@ export default async function AdminProductsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Products</h1>
           <p className="text-sm text-slate-500">{products.length} total products</p>
         </div>
-        <Button asChild className="gap-1">
-          <Link href="/admin/products/new">
-            <Plus className="h-4 w-4" />
-            Add Product
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" className="gap-1">
+            <Link href="/admin/products/import">
+              <Upload className="h-4 w-4" />
+              Import Product
+            </Link>
+          </Button>
+          <Button asChild className="gap-1">
+            <Link href="/admin/products/new">
+              <Plus className="h-4 w-4" />
+              Add Product
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {products.length === 0 ? (
