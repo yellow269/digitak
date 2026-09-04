@@ -72,6 +72,7 @@ export default function CheckoutPage() {
             product_type: item.product_type,
             supplier_shipping_cost: item.supplier_shipping_cost || 0,
             selected_colour: item.selected_colour || null,
+            selected_options: item.selected_options || null,
           })),
           customer: form,
           subtotal: cart.subtotal,

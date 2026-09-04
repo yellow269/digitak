@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { CartItem, Cart } from '@/lib/types';
+import type { CartItem, Cart, SelectedOptions } from '@/lib/types';
 
 const CART_KEY = 'everything-store-cart';
 
@@ -57,8 +57,27 @@ type CartContextType = {
 
 const CartContext = createContext<CartContextType | null>(null);
 
-export function cartItemKey(item: { productId: string; selected_colour?: { name: string } | null }): string {
-  return `${item.productId}:${item.selected_colour?.name || ''}`;
+export function cartItemKey(item: {
+  productId: string;
+  selected_colour?: { name: string } | null;
+  selected_options?: SelectedOptions | null;
+}): string {
+  if (item.selected_options && Object.keys(item.selected_options).length > 0) {
+    const sorted = Object.keys(item.selected_options).sort();
+    const parts = sorted.map((k) => `${k}=${item.selected_options![k].name}`);
+    return `${item.productId}:${parts.join(':')}`;
+  }
+  if (item.selected_colour) {
+    return `${item.productId}:Colour=${item.selected_colour.name}`;
+  }
+  return `${item.productId}:`;
+}
+
+export function formatOptionsLabel(options: SelectedOptions | null | undefined): string {
+  if (!options || Object.keys(options).length === 0) return '';
+  return Object.entries(options)
+    .map(([type, val]) => `${type}: ${val.name}`)
+    .join(', ');
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -120,7 +139,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
 export function useCart() {
   const context = useContext(CartContext);
   if (!context) {
-    // Return safe defaults for SSR / outside provider
     return {
       cart: { items: [], subtotal: 0, shipping: 0, total: 0 },
       addItem: () => {},

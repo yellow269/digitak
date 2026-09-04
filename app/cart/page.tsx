@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useCart, cartItemKey } from '@/hooks/use-cart';
+import { useCart, cartItemKey, formatOptionsLabel } from '@/hooks/use-cart';
 import { formatPrice } from '@/lib/format';
 
 export default function CartPage() {
@@ -67,6 +67,9 @@ export default function CartPage() {
                             />
                             <span className="text-xs text-slate-500">{item.selected_colour.name}</span>
                           </div>
+                        )}
+                        {item.selected_options && !item.selected_colour && (
+                          <p className="text-xs text-slate-500 mt-0.5">{formatOptionsLabel(item.selected_options)}</p>
                         )}
                         {item.shipping_estimate && (
                           <p className="text-xs text-slate-500 mt-0.5">{item.shipping_estimate}</p>

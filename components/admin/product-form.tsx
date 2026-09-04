@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
 import { slugify, formatPrice } from '@/lib/format';
 import { PRODUCT_TYPES, STOCK_STATUSES } from '@/lib/constants';
-import type { Category, Supplier, ProductType, StockStatus, ColourOption } from '@/lib/types';
+import type { Category, Supplier, ProductType, StockStatus, ColourOption, ProductOption, ProductOptionValue } from '@/lib/types';
 
 type ProductFormData = {
   name: string;
@@ -48,6 +48,7 @@ type ProductFormData = {
   supplier_notes: string;
   quantity_available: string;
   colours: ColourOption[];
+  options: ProductOption[];
 };
 
 const EMPTY: ProductFormData = {
@@ -83,6 +84,7 @@ const EMPTY: ProductFormData = {
   supplier_notes: '',
   quantity_available: '0',
   colours: [],
+  options: [],
 };
 
 export function ProductForm({
@@ -103,6 +105,9 @@ export function ProductForm({
   const [priceOverride, setPriceOverride] = useState(false);
   const [newColourName, setNewColourName] = useState('');
   const [newColourHex, setNewColourHex] = useState('#000000');
+  const [newOptionType, setNewOptionType] = useState('Size');
+  const [newOptionValue, setNewOptionValue] = useState('');
+  const [newOptionHex, setNewOptionHex] = useState('#000000');
 
   useEffect(() => {
     if (initialData) {
@@ -168,6 +173,34 @@ export function ProductForm({
     update('colours', form.colours.filter((_, idx) => idx !== i));
   }
 
+  function addOptionValue() {
+    const val = newOptionValue.trim();
+    if (!val) return;
+    const existing = form.options.find((o) => o.type === newOptionType);
+    if (existing) {
+      if (existing.values.some((v) => v.name.toLowerCase() === val.toLowerCase())) return;
+      update('options', form.options.map((o) =>
+        o.type === newOptionType
+          ? { ...o, values: [...o.values, { name: val, hex: newOptionHex }] }
+          : o
+      ));
+    } else {
+      update('options', [...form.options, { type: newOptionType, values: [{ name: val, hex: newOptionHex }] }]);
+    }
+    setNewOptionValue('');
+  }
+
+  function removeOptionValue(type: string, valueIndex: number) {
+    update('options', form.options
+      .map((o) => o.type === type ? { ...o, values: o.values.filter((_, i) => i !== valueIndex) } : o)
+      .filter((o) => o.values.length > 0)
+    );
+  }
+
+  function removeOptionType(type: string) {
+    update('options', form.options.filter((o) => o.type !== type));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -221,6 +254,7 @@ export function ProductForm({
       supplier_notes: form.supplier_notes || null,
       quantity_available: parseInt(form.quantity_available, 10) || 0,
       colours: form.colours.length > 0 ? form.colours : [],
+      options: form.options.length > 0 ? form.options : [],
     };
 
     let result;
@@ -623,49 +657,75 @@ export function ProductForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Colour Options</CardTitle>
+          <CardTitle>Product Options</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-slate-500">
-            Add available colour options for this product. Customers will see colour swatches on the product page.
+            Add variant options for this product (e.g. Colour, Size, Weight, Material, Style).
+            Colour options show as swatches; all others show as dropdowns.
           </p>
-          {form.colours.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {form.colours.map((colour, i) => (
-                <div key={i} className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5">
-                  <span
-                    className="inline-block h-4 w-4 rounded-full border border-slate-300"
-                    style={{ backgroundColor: colour.hex }}
-                  />
-                  <span className="text-sm font-medium text-slate-700">{colour.name}</span>
-                  <span className="text-xs text-slate-400">{colour.hex}</span>
-                  <button type="button" onClick={() => removeColour(i)} className="ml-1 text-slate-400 hover:text-red-500">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+
+          {form.options.length > 0 && (
+            <div className="space-y-3">
+              {form.options.map((opt) => (
+                <div key={opt.type} className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-slate-700">{opt.type}</span>
+                    <button type="button" onClick={() => removeOptionType(opt.type)} className="text-slate-400 hover:text-red-500">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {opt.values.map((val, vi) => (
+                      <div key={vi} className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2 py-1">
+                        {val.hex && (
+                          <span className="inline-block h-3 w-3 rounded-full border border-slate-300" style={{ backgroundColor: val.hex }} />
+                        )}
+                        <span className="text-xs font-medium text-slate-700">{val.name}</span>
+                        <button type="button" onClick={() => removeOptionValue(opt.type, vi)} className="text-slate-400 hover:text-red-500">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
           )}
+
           <div className="flex items-end gap-3">
+            <div className="w-36">
+              <Label>Type</Label>
+              <Select value={newOptionType} onValueChange={setNewOptionType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['Colour', 'Size', 'Weight', 'Material', 'Style', 'Storage', 'Capacity', 'Model'].map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex-1">
-              <Label>Colour Name</Label>
+              <Label>Value</Label>
               <Input
-                value={newColourName}
-                onChange={(e) => setNewColourName(e.target.value)}
-                placeholder="e.g. Black"
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addColour(); } }}
+                value={newOptionValue}
+                onChange={(e) => setNewOptionValue(e.target.value)}
+                placeholder={newOptionType === 'Colour' ? 'e.g. Red' : `e.g. ${newOptionType === 'Size' ? 'M' : newOptionType === 'Weight' ? '500g' : 'Value'}`}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addOptionValue(); } }}
               />
             </div>
-            <div className="w-20">
-              <Label>Hex</Label>
-              <input
-                type="color"
-                value={newColourHex}
-                onChange={(e) => setNewColourHex(e.target.value)}
-                className="h-10 w-full cursor-pointer rounded-md border border-slate-200"
-              />
-            </div>
-            <Button type="button" variant="outline" onClick={addColour} className="gap-1 shrink-0">
+            {newOptionType === 'Colour' && (
+              <div className="w-20">
+                <Label>Hex</Label>
+                <input
+                  type="color"
+                  value={newOptionHex}
+                  onChange={(e) => setNewOptionHex(e.target.value)}
+                  className="h-10 w-full cursor-pointer rounded-md border border-slate-200"
+                />
+              </div>
+            )}
+            <Button type="button" variant="outline" onClick={addOptionValue} className="gap-1 shrink-0">
               <Plus className="h-4 w-4" />
               Add
             </Button>

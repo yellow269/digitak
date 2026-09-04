@@ -18,6 +18,18 @@ export type ColourOption = {
   hex: string;
 };
 
+export type ProductOptionValue = {
+  name: string;
+  hex?: string;
+};
+
+export type ProductOption = {
+  type: string;
+  values: ProductOptionValue[];
+};
+
+export type SelectedOptions = Record<string, ProductOptionValue>;
+
 export type Product = {
   id: string;
   name: string;
@@ -58,6 +70,7 @@ export type Product = {
   sale_price?: number | null;
   quantity_available?: number;
   colours?: ColourOption[];
+  options?: ProductOption[];
   
   // Joined relation
   supplier?: Supplier | null;
@@ -223,6 +236,7 @@ export type OrderItem = {
   fulfillment_status: FulfillmentStatus;
   supplier_notes: string | null;
   selected_colour: ColourOption | null;
+  selected_options: SelectedOptions | null;
   created_at: string;
   product?: Product;
   supplier?: Supplier;
@@ -244,6 +258,7 @@ export type CartItem = {
   supplier_shipping_cost?: number | null;
   stock_status?: StockStatus;
   selected_colour?: ColourOption | null;
+  selected_options?: SelectedOptions | null;
 };
 
 export type Cart = {

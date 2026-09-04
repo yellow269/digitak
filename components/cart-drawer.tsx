@@ -5,7 +5,7 @@ import { ShoppingCart, X, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
-import { useCart, cartItemKey } from '@/hooks/use-cart';
+import { useCart, cartItemKey, formatOptionsLabel } from '@/hooks/use-cart';
 import { formatPrice } from '@/lib/format';
 import { useState } from 'react';
 
@@ -67,6 +67,9 @@ export function CartDrawer() {
                           {item.name}
                         </Link>
                         <p className="text-sm text-slate-500">{formatPrice(price, 'ZAR')}</p>
+                        {formatOptionsLabel(item.selected_options) && (
+                          <p className="text-xs text-slate-400">{formatOptionsLabel(item.selected_options)}</p>
+                        )}
                         <div className="mt-auto flex items-center gap-2">
                           <button
                             onClick={() => updateQuantity(cartItemKey(item), item.quantity - 1)}

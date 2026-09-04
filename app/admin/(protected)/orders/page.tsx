@@ -365,6 +365,11 @@ function OrderItemsList({ orderId }: { orderId: string }) {
                 <span className="text-xs text-slate-500">{item.selected_colour.name}</span>
               </div>
             )}
+            {item.selected_options && !item.selected_colour && (
+              <p className="text-xs text-slate-500 mt-0.5">
+                {Object.entries(item.selected_options).map(([type, val]) => `${type}: ${val.name}`).join(', ')}
+              </p>
+            )}
             <p className="text-xs text-slate-500">Qty: {item.quantity} x {formatPrice(item.unit_price, 'ZAR')}</p>
           </div>
           <div className="text-right">

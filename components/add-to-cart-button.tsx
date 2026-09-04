@@ -5,9 +5,19 @@ import { ShoppingCart, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/use-cart';
 import { toast } from 'sonner';
-import type { Product, ColourOption } from '@/lib/types';
+import type { Product, ColourOption, SelectedOptions } from '@/lib/types';
 
-export function AddToCartButton({ product, isAffiliate, selectedColour }: { product: Product; isAffiliate: boolean; selectedColour?: ColourOption | null }) {
+export function AddToCartButton({
+  product,
+  isAffiliate,
+  selectedColour,
+  selectedOptions,
+}: {
+  product: Product;
+  isAffiliate: boolean;
+  selectedColour?: ColourOption | null;
+  selectedOptions?: SelectedOptions | null;
+}) {
   const { addItem } = useCart();
   const displayPrice = product.selling_price || product.price;
 
@@ -26,6 +36,12 @@ export function AddToCartButton({ product, isAffiliate, selectedColour }: { prod
 
   function handleAddToCart() {
     if (!displayPrice) return;
+
+    const opts: SelectedOptions = selectedOptions || {};
+    if (selectedColour && !opts['Colour']) {
+      opts['Colour'] = { name: selectedColour.name, hex: selectedColour.hex };
+    }
+
     addItem({
       productId: product.id,
       name: product.name,
@@ -38,9 +54,14 @@ export function AddToCartButton({ product, isAffiliate, selectedColour }: { prod
       supplier_shipping_cost: product.supplier_shipping_cost,
       stock_status: product.stock_status,
       selected_colour: selectedColour || null,
+      selected_options: Object.keys(opts).length > 0 ? opts : null,
     });
-    const colourLabel = selectedColour ? ` (${selectedColour.name})` : '';
-    toast.success(`${product.name}${colourLabel} added to cart`);
+
+    const optionLabel = Object.entries(opts)
+      .map(([, v]) => v.name)
+      .join(', ');
+    const label = optionLabel ? ` (${optionLabel})` : '';
+    toast.success(`${product.name}${label} added to cart`);
   }
 
   function handleBuyNow() {
