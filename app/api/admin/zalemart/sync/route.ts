@@ -113,6 +113,7 @@ function buildProductRow(
     category_id: categoryId,
     vendor_name: product.vendor || 'Zalemart',
     image_url: imageUrl,
+    affiliate_url: `${ZALEMART_BASE_URL}/${product.handle}`,
     price: product.variants[0]?.price || null,
     currency: 'ZAR',
     status: existing?.id ? undefined : 'draft',
@@ -164,20 +165,24 @@ export async function POST(req: NextRequest) {
     const categoryMap = await getCategoryMap(supabase);
     const existingMap = await getExistingProducts(supabase, supplierId);
 
-    const syncLog = await supabase
-      .from('supplier_sync_log')
-      .insert({
-        supplier_id: supplierId,
-        sync_type: mode === 'import' ? 'import' : 'sync',
-        feed_url: ZALEMART_FEED_URL,
-        products_found: products.length,
-        variants_total: products.reduce((sum, p) => sum + p.variants.length, 0),
-        status: 'running',
-      })
-      .select('id')
-      .single();
-
-    const logId = syncLog.data?.id;
+    let logId: string | null = null;
+    try {
+      const syncLog = await supabase
+        .from('supplier_sync_log')
+        .insert({
+          supplier_id: supplierId,
+          sync_type: mode === 'import' ? 'import' : 'sync',
+          feed_url: ZALEMART_FEED_URL,
+          products_found: products.length,
+          variants_total: products.reduce((sum, p) => sum + p.variants.length, 0),
+          status: 'running',
+        })
+        .select('id')
+        .single();
+      logId = syncLog.data?.id ?? null;
+    } catch (logErr) {
+      console.warn('[ZalemartSync] Could not create sync log (table may not exist):', logErr);
+    }
 
     const result: SyncResult = {
       productsFound: products.length,
@@ -244,9 +249,10 @@ export async function POST(req: NextRequest) {
           result.productsUpdated++;
         } else if (mode === 'import') {
           // Only create new in import mode
-          const { error } = await supabase.from('products').insert(row);
+          const { data: inserted, error } = await supabase.from('products').insert(row).select('id, name, slug').single();
           if (error) {
-            result.errors.push(`${product.handle}: ${error.message}`);
+            const detail = error.details || error.hint || '';
+            result.errors.push(`${product.title} (${product.handle}): ${error.message}${detail ? ' — ' + detail : ''}`);
           } else {
             result.productsCreated++;
           }
@@ -285,12 +291,18 @@ export async function GET() {
   try {
     const supabase = await createServerSupabaseClient();
 
-    // Get latest sync logs
-    const { data: logs } = await supabase
-      .from('supplier_sync_log')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(10);
+    // Get latest sync logs (table may not exist yet)
+    let logs: unknown[] = [];
+    try {
+      const { data } = await supabase
+        .from('supplier_sync_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      logs = data || [];
+    } catch {
+      // supplier_sync_log table doesn't exist — migration 0015 not applied
+    }
 
     // Get supplier
     const { data: supplier } = await supabase

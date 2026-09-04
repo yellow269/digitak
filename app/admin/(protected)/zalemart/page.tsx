@@ -433,14 +433,14 @@ export default function ZalemartPage() {
             <Card
               className={
                 syncResult.errors.length > 0
-                  ? 'border-amber-300 bg-amber-50'
+                  ? 'border-red-300 bg-red-50'
                   : 'border-green-300 bg-green-50'
               }
             >
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
                   {syncResult.errors.length > 0 ? (
-                    <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                    <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
                   ) : (
                     <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
                   )}
