@@ -99,9 +99,9 @@ function parseCsvRows(csvText: string): string[][] {
         // End of row
         fields.push(current);
         current = '';
-        // Skip empty trailing lines
+        // Skip empty trailing lines — must copy fields array (push is by reference)
         if (fields.length > 1 || fields[0] !== '') {
-          rows.push(fields);
+          rows.push([...fields]);
         }
         fields.length = 0;
         i++;
@@ -115,7 +115,7 @@ function parseCsvRows(csvText: string): string[][] {
   // Push last field and row
   fields.push(current);
   if (fields.length > 1 || fields[0] !== '') {
-    rows.push(fields);
+    rows.push([...fields]);
   }
 
   return rows;
