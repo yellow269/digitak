@@ -78,11 +78,7 @@ export function ProductActions({ product, isAffiliate }: { product: Product; isA
       for (const val of option.values) {
         const testOpts = { ...selectedOptions, [option.type]: val };
         const vs = getVariantStock(product.variant_stock, testOpts);
-        if (vs) {
-          if (vs.stock > 0) {
-            result[option.type].add(val.name);
-          }
-        } else {
+        if (vs && vs.stock > 0) {
           result[option.type].add(val.name);
         }
       }
@@ -91,8 +87,12 @@ export function ProductActions({ product, isAffiliate }: { product: Product; isA
   }, [product.variant_stock, options, selectedOptions]);
 
   const currentVariant = useMemo(() => {
-    if (Object.keys(selectedOptions).length === 0) return null;
-    return getVariantStock(product.variant_stock, selectedOptions);
+    if (Object.keys(selectedOptions).length === 0) return { variant: null, exists: false };
+    const vs = getVariantStock(product.variant_stock, selectedOptions);
+    if (vs) return { variant: vs, exists: true };
+    // Combination not in variant_stock — check if we even have variant_stock data
+    const hasStockData = product.variant_stock && Object.keys(product.variant_stock).length > 0;
+    return { variant: null, exists: hasStockData ? false : null };
   }, [product.variant_stock, selectedOptions]);
 
   if (options.length === 0) {
@@ -100,7 +100,8 @@ export function ProductActions({ product, isAffiliate }: { product: Product; isA
   }
 
   const allSelected = options.every((o) => selectedOptions[o.type]);
-  const isCurrentOOS = currentVariant !== null && currentVariant.stock <= 0;
+  const isCurrentOOS = currentVariant.variant !== null && currentVariant.variant.stock <= 0;
+  const isCurrentMissing = currentVariant.exists === false;
   const missingOptions = options
     .filter((o) => !selectedOptions[o.type])
     .map((o) => o.type.toLowerCase());
@@ -226,11 +227,15 @@ export function ProductActions({ product, isAffiliate }: { product: Product; isA
         <p className="text-sm text-red-600 font-medium">This combination is out of stock.</p>
       )}
 
+      {allSelected && isCurrentMissing && (
+        <p className="text-sm text-red-600 font-medium">This combination is not available.</p>
+      )}
+
       {!allSelected && missingLabel && (
         <p className="text-sm text-slate-500">{missingLabel}</p>
       )}
 
-      {allSelected && !isCurrentOOS && (
+      {allSelected && !isCurrentOOS && !isCurrentMissing && (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
           {options.map((o) => {
             const val = selectedOptions[o.type];
@@ -249,8 +254,8 @@ export function ProductActions({ product, isAffiliate }: { product: Product; isA
           product={product}
           isAffiliate={isAffiliate}
           selectedOptions={allSelected ? selectedOptions : null}
-          variantSku={currentVariant?.sku || null}
-          disabled={!allSelected || isCurrentOOS}
+          variantSku={currentVariant.variant?.sku || null}
+          disabled={!allSelected || isCurrentOOS || isCurrentMissing}
         />
       </div>
     </div>
