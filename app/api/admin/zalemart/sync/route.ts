@@ -108,6 +108,25 @@ function buildProductRow(
 
   const variantStock = buildVariantStock(product.variants);
 
+  // Fallback: if options were extracted from description but variant_stock is empty,
+  // generate synthetic variant_stock entries from the extracted sizes
+  if (Object.keys(variantStock).length === 0 && product.options.length > 0) {
+    const sizeOption = product.options.find((o) => o.type.toLowerCase() === 'size');
+    if (sizeOption && sizeOption.values.length > 0) {
+      const baseSku = product.variants[0]?.sku || product.handle;
+      const basePrice = product.variants[0]?.price || 0;
+      const baseStock = product.variants[0]?.inventoryQuantity ?? 0;
+      for (const val of sizeOption.values) {
+        const key = `Size=${val.name}`;
+        variantStock[key] = {
+          stock: baseStock,
+          sku: baseSku ? `${baseSku}-${val.name}` : '',
+          price: basePrice || undefined,
+        };
+      }
+    }
+  }
+
   return {
     name: product.title,
     slug,

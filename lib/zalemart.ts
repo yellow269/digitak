@@ -244,6 +244,61 @@ function safeNum(v: string | undefined): number {
  *  [26] (empty separator)
  *  [27] Product Image
  */
+const SIZE_ORDER = [
+  'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL',
+];
+
+function expandSizeRange(text: string): string[] | null {
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+
+  // Range with dash: "XS-2XL" or "XS – 2XL"
+  const rangeMatch = cleaned.match(/^(\S+)\s*[-–]\s*(\S+)$/);
+  if (rangeMatch) {
+    const start = rangeMatch[1].toUpperCase();
+    const end = rangeMatch[2].toUpperCase();
+    const startIdx = SIZE_ORDER.indexOf(start);
+    const endIdx = SIZE_ORDER.indexOf(end);
+    if (startIdx !== -1 && endIdx !== -1 && startIdx <= endIdx) {
+      return SIZE_ORDER.slice(startIdx, endIdx + 1);
+    }
+    // Numeric range: "24-32" step by 2
+    const numStart = parseInt(start);
+    const numEnd = parseInt(end);
+    if (!isNaN(numStart) && !isNaN(numEnd) && numStart <= numEnd) {
+      const sizes: string[] = [];
+      for (let n = numStart; n <= numEnd; n += 2) sizes.push(String(n));
+      return sizes.length > 0 ? sizes : null;
+    }
+  }
+
+  // Comma-separated: "24, 26, 28, 30"
+  const parts = cleaned.split(/[,;/]\s*/).map((s) => s.trim()).filter(Boolean);
+  if (parts.length >= 2) return parts;
+
+  return null;
+}
+
+function extractSizesFromDescription(description: string): string[] | null {
+  if (!description) return null;
+  const text = description.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+  const patterns = [
+    /(?:available\s+)?sizes?\s*[:=]\s*(.+)/i,
+    /(?:comes?\s+in|available\s+in|fit[s]?\s*[:=])\s*(.+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const sizeText = match[1].trim().replace(/[.;,]$/, '');
+      const sizes = expandSizeRange(sizeText);
+      if (sizes && sizes.length > 0) return sizes;
+    }
+  }
+
+  return null;
+}
+
 export function parseZalemartCsv(csvText: string): ZalemartProduct[] {
   const allRows = parseCsvRows(csvText);
   if (allRows.length < 2) return [];
@@ -359,6 +414,17 @@ export function parseZalemartCsv(csvText: string): ZalemartProduct[] {
           : {}),
       })),
     }));
+
+    // Fallback: if no options from variant columns, extract sizes from description
+    if (product.options.length === 0 && product.variants.length > 0) {
+      const descSizes = extractSizesFromDescription(product.description);
+      if (descSizes && descSizes.length > 0) {
+        product.options = [{
+          type: 'Size',
+          values: descSizes.map((name) => ({ name })),
+        }];
+      }
+    }
   }
 
   return Array.from(productMap.values());
