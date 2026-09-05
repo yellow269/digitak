@@ -5,6 +5,68 @@ export const ZALEMART_FEED_URL =
 
 export const ZALEMART_BASE_URL = 'https://www.zalemart.co.za/products';
 
+const COLOUR_HEX_MAP: Record<string, string> = {
+  black: '#000000',
+  white: '#FFFFFF',
+  red: '#FF0000',
+  blue: '#0000FF',
+  green: '#008000',
+  yellow: '#FFFF00',
+  orange: '#FFA500',
+  purple: '#800080',
+  pink: '#FFC0CB',
+  brown: '#A52A2A',
+  grey: '#808080',
+  gray: '#808080',
+  navy: '#000080',
+  beige: '#F5F5DC',
+  cream: '#FFFDD0',
+  maroon: '#800000',
+  teal: '#008080',
+  cyan: '#00FFFF',
+  lavender: '#E6E6FA',
+  peach: '#FFDAB9',
+  coral: '#FF7F50',
+  burgundy: '#800020',
+  charcoal: '#36454F',
+  'charcoal black': '#36454F',
+  gold: '#FFD700',
+  silver: '#C0C0C0',
+  ivory: '#FFFFF0',
+  khaki: '#F0E68C',
+  olive: '#808000',
+  plum: '#8E4585',
+  salmon: '#FA8072',
+  tan: '#D2B48C',
+  turquoise: '#40E0D0',
+  wine: '#722F37',
+  'light blue': '#ADD8E6',
+  'dark blue': '#00008B',
+  'light pink': '#FFB6C1',
+  'dark green': '#006400',
+  'dark red': '#8B0000',
+  'light green': '#90EE90',
+  'dark grey': '#A9A9A9',
+  'dark gray': '#A9A9A9',
+  'light grey': '#D3D3D3',
+  'light gray': '#D3D3D3',
+  'sky blue': '#87CEEB',
+  'baby blue': '#89CFF0',
+  'royal blue': '#4169E1',
+  'hot pink': '#FF69B4',
+  'dark purple': '#301551',
+  'light purple': '#E6E6FA',
+  'army green': '#4B5320',
+  'forest green': '#228B22',
+  'lime green': '#32CD32',
+  'mint green': '#98FF98',
+  'rose gold': '#B76E79',
+  'dusty pink': '#DCAE96',
+  'nude': '#E3BC9A',
+  'off white': '#FAFAFA',
+  'light wash blue': '#ADD8E6',
+};
+
 const TYPE_TO_CATEGORY: Record<string, string> = {
   dress: 'dresses',
   dresses: 'dresses',
@@ -290,7 +352,12 @@ export function parseZalemartCsv(csvText: string): ZalemartProduct[] {
     }
     product.options = Array.from(optionsMap.entries()).map(([type, values]) => ({
       type,
-      values: Array.from(values).map((name) => ({ name })),
+      values: Array.from(values).map((name) => ({
+        name,
+        ...(type.toLowerCase() === 'colour' && COLOUR_HEX_MAP[name.toLowerCase()]
+          ? { hex: COLOUR_HEX_MAP[name.toLowerCase()] }
+          : {}),
+      })),
     }));
   }
 
