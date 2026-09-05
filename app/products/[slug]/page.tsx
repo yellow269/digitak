@@ -11,7 +11,6 @@ import { PUBLIC_PRODUCT_COLUMNS } from '@/lib/queries';
 import { formatPrice } from '@/lib/format';
 import { AFFILIATE_DISCLOSURE_SHORT, SITE_NAME } from '@/lib/constants';
 import type { Product } from '@/lib/types';
-import { AddToCartButton } from '@/components/add-to-cart-button';
 import { ProductActions } from '@/components/product-actions';
 
 export const revalidate = 3600;
@@ -131,9 +130,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         <span className="text-slate-900">{product.name}</span>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid gap-10 lg:grid-cols-[1fr_1fr]">
         {/* Image */}
-        <div className="relative aspect-square overflow-hidden rounded-xl bg-slate-100">
+        <div className="relative aspect-square overflow-hidden rounded-2xl bg-slate-100 lg:sticky lg:top-24 lg:self-start">
           {product.image_url ? (
             <Image
               src={product.image_url}
@@ -158,23 +157,22 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
         {/* Info */}
         <div className="flex flex-col">
+          {/* Category */}
           {product.category && (
             <Link
               href={`/category/${product.category.slug}`}
-              className="text-sm font-medium text-sky-600 hover:text-sky-700"
+              className="text-xs font-semibold uppercase tracking-wider text-sky-600 hover:text-sky-700"
             >
               {product.category.name}
             </Link>
           )}
-          <h1 className="mt-1 text-3xl font-bold text-slate-900">{product.name}</h1>
 
-          {product.short_description && (
-            <p className="mt-3 text-lg text-slate-600">{product.short_description}</p>
-          )}
+          {/* Title */}
+          <h1 className="mt-1 text-2xl font-bold text-slate-900 lg:text-3xl">{product.name}</h1>
 
           {/* Rating */}
           {product.rating > 0 && (
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-2 flex items-center gap-2">
               <div className="flex items-center gap-0.5">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Star
@@ -186,70 +184,63 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 ))}
               </div>
               <span className="text-sm font-medium text-slate-700">{product.rating.toFixed(1)}</span>
-              <span className="text-sm text-slate-500">({product.review_count} reviews)</span>
+              <span className="text-sm text-slate-400">({product.review_count})</span>
             </div>
           )}
 
           {/* Price */}
           <div className="mt-4 flex items-baseline gap-3">
-            {isOnSale && (
+            <span className="text-3xl font-bold text-slate-900">
+              {formatPrice(isOnSale ? (product.sale_price ?? null) : (displayPrice ?? null), product.currency || 'ZAR')}
+            </span>
+            {isOnSale && product.price && (
               <span className="text-lg text-slate-400 line-through">
                 {formatPrice(product.price, product.currency || 'ZAR')}
               </span>
             )}
-            <span className="text-3xl font-bold text-slate-900">
-              {formatPrice(isOnSale ? (product.sale_price ?? null) : (displayPrice ?? null), product.currency || 'ZAR')}
-            </span>
           </div>
 
-          {/* Stock & Shipping */}
+          {/* Condition / Badges */}
           <div className="mt-3 flex flex-wrap gap-2">
-            <Badge variant={product.stock_status === 'out_of_stock' ? 'destructive' : 'secondary'}>
-              {product.stock_status === 'out_of_stock' ? 'Out of Stock' : 'In Stock'}
-            </Badge>
-            {product.shipping_estimate && (
-              <Badge variant="outline" className="gap-1">
-                <Truck className="h-3 w-3" />
-                {product.shipping_estimate}
-              </Badge>
-            )}
+            <Badge variant="secondary" className="text-xs">New</Badge>
             {isDropshipping && (
-              <Badge variant="outline" className="gap-1 text-green-700 border-green-200 bg-green-50">
+              <Badge variant="outline" className="gap-1 text-xs text-green-700 border-green-200 bg-green-50">
+                <Truck className="h-3 w-3" />
                 Delivered directly to your door
               </Badge>
             )}
           </div>
 
-          {/* Vendor */}
-          {product.vendor_name && (
-            <p className="mt-2 text-sm text-slate-600">
-              Vendor: <span className="font-medium">{product.vendor_name}</span>
+          {/* Short description */}
+          {product.short_description && (
+            <p className="mt-4 text-sm leading-relaxed text-slate-600">{product.short_description}</p>
+          )}
+
+          {/* Divider */}
+          <div className="mt-6 border-t border-slate-200" />
+
+          {/* Options */}
+          <div className="mt-6">
+            <ProductActions product={product} isAffiliate={isAffiliate} />
+          </div>
+
+          {isAffiliate && (
+            <p className="mt-3 text-xs text-slate-500">
+              You will be redirected to the vendor&apos;s page. {AFFILIATE_DISCLOSURE_SHORT}
             </p>
           )}
 
-          {/* Affiliate disclosure */}
-          {isAffiliate && (
-            <div className="mt-4">
-              <Badge variant="secondary" className="gap-1 text-amber-700 bg-amber-50">
-                Affiliate Link
-              </Badge>
-            </div>
+          {/* Vendor */}
+          {product.vendor_name && (
+            <p className="mt-4 text-xs text-slate-400">
+              Vendor: <span className="font-medium text-slate-600">{product.vendor_name}</span>
+            </p>
           )}
-
-          {/* CTA */}
-          <div className="mt-6 flex flex-col gap-3">
-            <ProductActions product={product} isAffiliate={isAffiliate} />
-            {isAffiliate && (
-              <p className="text-xs text-slate-500">
-                You will be redirected to the vendor&apos;s page. {AFFILIATE_DISCLOSURE_SHORT}
-              </p>
-            )}
-          </div>
 
           {/* Benefits */}
           {benefits.length > 0 && (
             <div className="mt-8">
-              <h2 className="text-lg font-semibold text-slate-900">Key benefits</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-900">Key benefits</h2>
               <ul className="mt-3 space-y-2">
                 {benefits.map((b, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
@@ -265,9 +256,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
       {/* Full description */}
       {product.description && (
-        <div className="mt-12 max-w-3xl">
-          <h2 className="text-2xl font-bold text-slate-900">About this product</h2>
-          <div className="mt-4 whitespace-pre-line text-slate-700 leading-relaxed">
+        <div className="mt-16 max-w-3xl">
+          <h2 className="text-xl font-bold text-slate-900">About this product</h2>
+          <div className="mt-4 whitespace-pre-line text-sm leading-relaxed text-slate-700">
             {product.description}
           </div>
         </div>
@@ -291,9 +282,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
       {/* Related Products */}
       {relatedProducts.length > 0 && (
-        <div className="mt-12">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">Related Products</h2>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-16">
+          <h2 className="text-xl font-bold text-slate-900 mb-6">Related Products</h2>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {relatedProducts.map((p) => (
               <div key={p.id}>
                 <Link href={`/products/${p.slug}`}>
