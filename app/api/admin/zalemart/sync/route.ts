@@ -130,8 +130,8 @@ function buildProductRow(
     selling_price: sellingPrice,
     stock_status: stockStatus,
     quantity_available: product.totalStock,
-    options: product.options.length > 0 ? product.options : undefined,
-    variant_stock: Object.keys(variantStock).length > 0 ? variantStock : undefined,
+    options: product.options.length > 0 ? product.options : [],
+    variant_stock: Object.keys(variantStock).length > 0 ? variantStock : {},
     sync_enabled: true,
     last_synced_at: new Date().toISOString(),
   };
@@ -250,15 +250,33 @@ export async function POST(req: NextRequest) {
             updateData.markup_percentage = row.markup_percentage;
           }
 
-          await supabase.from('products').update(updateData).eq('id', existing.id);
-          result.productsUpdated++;
+          const { data: updated, error: updateErr } = await supabase
+            .from('products')
+            .update(updateData)
+            .eq('id', existing.id)
+            .select('id, options, variant_stock')
+            .single();
+
+          if (updateErr) {
+            result.errors.push(`Update ${product.handle}: ${updateErr.message}`);
+          } else {
+            console.log(`[ZalemartSync] Updated ${product.handle}:`, {
+              optionsCount: Array.isArray(updated?.options) ? updated.options.length : 'not array',
+              variantStockKeys: updated?.variant_stock ? Object.keys(updated.variant_stock).length : 'null',
+            });
+            result.productsUpdated++;
+          }
         } else if (mode === 'import') {
           // Only create new in import mode
-          const { data: inserted, error } = await supabase.from('products').insert(row).select('id, name, slug').single();
+          const { data: inserted, error } = await supabase.from('products').insert(row).select('id, name, slug, options, variant_stock').single();
           if (error) {
             const detail = error.details || error.hint || '';
             result.errors.push(`${product.title} (${product.handle}): ${error.message}${detail ? ' — ' + detail : ''}`);
           } else {
+            console.log(`[ZalemartSync] Created ${product.handle}:`, {
+              optionsCount: Array.isArray(inserted?.options) ? inserted.options.length : 'not array',
+              variantStockKeys: inserted?.variant_stock ? Object.keys(inserted.variant_stock).length : 'null',
+            });
             result.productsCreated++;
           }
         }
