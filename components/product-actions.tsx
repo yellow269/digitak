@@ -36,15 +36,7 @@ export function ProductActions({ product, isAffiliate }: { product: Product; isA
       ? [{ type: 'Colour', values: product.colours }]
       : [];
 
-  const [selectedOptions, setSelectedOptions] = useState<SelectedOptions>(() => {
-    const initial: SelectedOptions = {};
-    options.forEach((opt) => {
-      if (opt.values.length === 1) {
-        initial[opt.type] = opt.values[0];
-      }
-    });
-    return initial;
-  });
+  const [selectedOptions, setSelectedOptions] = useState<SelectedOptions>({});
 
   function handleSelect(type: string, value: string) {
     const option = options.find((o) => o.type === type);
