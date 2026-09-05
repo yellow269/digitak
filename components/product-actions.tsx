@@ -5,6 +5,26 @@ import { Check } from 'lucide-react';
 import type { Product, ProductOption, SelectedOptions, VariantStock } from '@/lib/types';
 import { AddToCartButton } from '@/components/add-to-cart-button';
 
+const SIZE_SORT_ORDER = [
+  'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL',
+  '24', '26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', '48',
+];
+
+function sortOptionValues(values: { name: string; hex?: string }[], optionType: string): { name: string; hex?: string }[] {
+  if (optionType.toLowerCase() !== 'size') return values;
+  return [...values].sort((a, b) => {
+    const ai = SIZE_SORT_ORDER.indexOf(a.name.toUpperCase());
+    const bi = SIZE_SORT_ORDER.indexOf(b.name.toUpperCase());
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    const numA = parseInt(a.name);
+    const numB = parseInt(b.name);
+    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 function buildVariantKey(opts: SelectedOptions): string {
   return Object.entries(opts)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -81,23 +101,26 @@ export function ProductActions({ product, isAffiliate }: { product: Product; isA
 
   const allSelected = options.every((o) => selectedOptions[o.type]);
   const isCurrentOOS = currentVariant !== null && currentVariant.stock <= 0;
-  const selectedCount = options.filter((o) => selectedOptions[o.type]).length;
   const missingOptions = options
     .filter((o) => !selectedOptions[o.type])
     .map((o) => o.type.toLowerCase());
 
-  const missingLabel =
-    missingOptions.length === 2
-      ? `Please select a ${missingOptions[0]} and ${missingOptions[1]}`
-      : missingOptions.length === 1
-        ? `Please select a ${missingOptions[0]}`
-        : '';
+  let missingLabel = '';
+  if (missingOptions.length === 1) {
+    missingLabel = `Please select a ${missingOptions[0]}`;
+  } else if (missingOptions.length === 2) {
+    missingLabel = `Please select a ${missingOptions[0]} and ${missingOptions[1]}`;
+  } else if (missingOptions.length > 2) {
+    const last = missingOptions.pop()!;
+    missingLabel = `Please select a ${missingOptions.join(', ')}, and ${last}`;
+  }
 
   return (
     <div className="space-y-6">
       {options.map((option) => {
         const selected = selectedOptions[option.type];
         const isColourType = option.type.toLowerCase() === 'colour';
+        const sortedValues = sortOptionValues(option.values, option.type);
         const availableNames = inStockValues?.[option.type];
 
         if (isColourType) {
@@ -110,7 +133,7 @@ export function ProductActions({ product, isAffiliate }: { product: Product; isA
                 )}
               </div>
               <div className="flex flex-wrap gap-3">
-                {option.values.map((val) => {
+                {sortedValues.map((val) => {
                   const isSelected = selected?.name === val.name;
                   const isOOS = availableNames && !availableNames.has(val.name);
                   const hex = val.hex || '#ccc';
@@ -173,7 +196,7 @@ export function ProductActions({ product, isAffiliate }: { product: Product; isA
               )}
             </div>
             <div className="flex flex-wrap gap-2">
-              {option.values.map((val) => {
+              {sortedValues.map((val) => {
                 const isSelected = selected?.name === val.name;
                 const isOOS = availableNames && !availableNames.has(val.name);
                 return (
@@ -203,8 +226,22 @@ export function ProductActions({ product, isAffiliate }: { product: Product; isA
         <p className="text-sm text-red-600 font-medium">This combination is out of stock.</p>
       )}
 
-      {!allSelected && selectedCount > 0 && (
+      {!allSelected && missingLabel && (
         <p className="text-sm text-slate-500">{missingLabel}</p>
+      )}
+
+      {allSelected && !isCurrentOOS && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+          {options.map((o) => {
+            const val = selectedOptions[o.type];
+            if (!val) return null;
+            return (
+              <span key={o.type}>
+                <span className="font-medium text-slate-900">{o.type}:</span> {val.name}
+              </span>
+            );
+          })}
+        </div>
       )}
 
       <div className="flex flex-col gap-2">
