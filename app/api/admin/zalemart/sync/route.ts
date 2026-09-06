@@ -264,7 +264,6 @@ export async function POST(req: NextRequest) {
           // Update: preserve selling_price if auto_repricing is off
           const updateData: Record<string, unknown> = {
             name: row.name,
-            slug: row.slug,
             short_description: row.short_description,
             description: row.description,
             category_id: row.category_id,
