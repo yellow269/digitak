@@ -299,6 +299,12 @@ function extractSizesFromDescription(description: string): string[] | null {
   return null;
 }
 
+function normalizeHandle(raw: string): string {
+  // Strip trailing numeric suffixes like -1, -2, -3, -4 that Zalemart
+  // uses for duplicate CSV rows of the same product.
+  return raw.replace(/-\d+$/, '');
+}
+
 export function parseZalemartCsv(csvText: string): ZalemartProduct[] {
   const allRows = parseCsvRows(csvText);
   if (allRows.length < 2) return [];
@@ -312,7 +318,7 @@ export function parseZalemartCsv(csvText: string): ZalemartProduct[] {
     if (row.length < 25) continue;
 
     const title = cleanTitle(row[0] || '');
-    const handle = (row[1] || '').trim();
+    const handle = normalizeHandle((row[1] || '').trim());
     const description = row[2] || '';
     const vendor = (row[3] || '').trim();
     const productType = (row[5] || '').trim();

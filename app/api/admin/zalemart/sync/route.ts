@@ -51,6 +51,10 @@ async function getZalemartSupplierId(supabase: ReturnType<typeof createServiceRo
   return data.id;
 }
 
+function normalizeHandle(raw: string): string {
+  return raw.replace(/-\d+$/, '');
+}
+
 async function getExistingProducts(
   supabase: ReturnType<typeof createServiceRoleClient>,
   supplierId: string
@@ -63,7 +67,18 @@ async function getExistingProducts(
 
   const map = new Map();
   for (const p of data || []) {
-    map.set(p.supplier_handle, p);
+    // Normalize handle to match parser output (strip trailing -N suffixes)
+    // Use the FIRST encountered product for each normalized handle (prefer the one without suffix)
+    const normalized = normalizeHandle(p.supplier_handle);
+    if (!map.has(normalized)) {
+      map.set(normalized, p);
+    } else {
+      // If we already have one, keep the one with the shorter handle (original, no suffix)
+      const existing = map.get(normalized);
+      if (p.supplier_handle.length < existing.supplier_handle.length) {
+        map.set(normalized, p);
+      }
+    }
   }
   return map;
 }
@@ -249,14 +264,17 @@ export async function POST(req: NextRequest) {
           // Update: preserve selling_price if auto_repricing is off
           const updateData: Record<string, unknown> = {
             name: row.name,
+            slug: row.slug,
             short_description: row.short_description,
             description: row.description,
             category_id: row.category_id,
             vendor_name: row.vendor_name,
             image_url: row.image_url,
+            affiliate_url: row.affiliate_url,
             price: row.price,
             supplier_cost: row.supplier_cost,
             supplier_url: row.supplier_url,
+            supplier_handle: product.handle,
             stock_status: row.stock_status,
             quantity_available: row.quantity_available,
             options: row.options,
@@ -287,14 +305,35 @@ export async function POST(req: NextRequest) {
           }
         } else if (mode === 'import') {
           // Only create new in import mode
-          const { data: inserted, error } = await supabase.from('products').insert(row).select('id, name, slug, options, variant_stock').single();
-          if (error) {
-            const detail = error.details || error.hint || '';
-            result.errors.push(`${product.title} (${product.handle}): ${error.message}${detail ? ' — ' + detail : ''}`);
+          // Handle slug collision: append numeric suffix until unique
+          let insertRow = { ...row };
+          let attempt = 0;
+          let insertError = null;
+          let insertedData = null;
+          while (attempt < 10) {
+            const { data, error } = await supabase.from('products').insert(insertRow).select('id, name, slug, options, variant_stock').single();
+            if (!error) {
+              insertedData = data;
+              insertError = null;
+              break;
+            }
+            if (error.message?.includes('duplicate key value violates unique constraint "products_slug_key"')) {
+              attempt++;
+              insertRow.slug = `${row.slug}-${attempt}`;
+              insertError = error;
+            } else {
+              insertError = error;
+              break;
+            }
+          }
+          if (insertError && !insertedData) {
+            const detail = insertError.details || insertError.hint || '';
+            result.errors.push(`${product.title} (${product.handle}): ${insertError.message}${detail ? ' — ' + detail : ''}`);
           } else {
             console.log(`[ZalemartSync] Created ${product.handle}:`, {
-              optionsCount: Array.isArray(inserted?.options) ? inserted.options.length : 'not array',
-              variantStockKeys: inserted?.variant_stock ? Object.keys(inserted.variant_stock).length : 'null',
+              slug: insertedData?.slug,
+              optionsCount: Array.isArray(insertedData?.options) ? insertedData.options.length : 'not array',
+              variantStockKeys: insertedData?.variant_stock ? Object.keys(insertedData.variant_stock).length : 'null',
             });
             result.productsCreated++;
           }
@@ -317,6 +356,50 @@ export async function POST(req: NextRequest) {
           error_message: result.errors.length > 0 ? result.errors.join('\n') : null,
         })
         .eq('id', logId);
+    }
+
+    // Cleanup orphaned products: find Zalemart products whose normalized handle
+    // matches an imported product but whose raw handle is different (old -N duplicates)
+    try {
+      const { data: allSupplierProducts } = await supabase
+        .from('products')
+        .select('id, supplier_handle')
+        .eq('supplier_id', supplierId)
+        .not('supplier_handle', 'is', null);
+
+      if (allSupplierProducts && allSupplierProducts.length > 0) {
+        const handleGroups = new Map<string, { id: string; supplier_handle: string }[]>();
+        for (const p of allSupplierProducts) {
+          const norm = normalizeHandle(p.supplier_handle);
+          if (!handleGroups.has(norm)) handleGroups.set(norm, []);
+          handleGroups.get(norm)!.push(p);
+        }
+        // Delete all but the canonical product in each group
+        const orphanIds: string[] = [];
+        for (const [, group] of handleGroups) {
+          if (group.length > 1) {
+            // Keep the one with the shortest handle (the canonical one), delete the rest
+            group.sort((a, b) => a.supplier_handle.length - b.supplier_handle.length);
+            for (let i = 1; i < group.length; i++) {
+              orphanIds.push(group[i].id);
+            }
+          }
+        }
+        if (orphanIds.length > 0) {
+          const { error: delErr } = await supabase
+            .from('products')
+            .delete()
+            .in('id', orphanIds);
+          if (delErr) {
+            console.warn('[ZalemartSync] Could not delete orphaned products:', delErr.message);
+          } else {
+            console.log(`[ZalemartSync] Cleaned up ${orphanIds.length} orphaned duplicate products`);
+            result.productsDeactivated += orphanIds.length;
+          }
+        }
+      }
+    } catch (cleanupErr) {
+      console.warn('[ZalemartSync] Cleanup pass failed:', cleanupErr);
     }
 
     return NextResponse.json(result);
