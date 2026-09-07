@@ -20,6 +20,7 @@ import {
   DollarSign,
   Store,
   Settings,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
@@ -28,6 +29,7 @@ import { cn } from '@/lib/utils';
 const NAV_ITEMS = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Products', icon: Package },
+  { href: '/admin/publish', label: 'Publish', icon: Eye },
   { href: '/admin/suppliers', label: 'Suppliers', icon: Truck },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/admin/customers', label: 'Customers', icon: Users },
