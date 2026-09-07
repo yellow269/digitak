@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Package, Search, Truck, ExternalLink, Loader2, Clock, CheckCircle } from 'lucide-react';
+import { Package, Search, Truck, ExternalLink, Loader2, Clock, CheckCircle, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
 import { formatPrice, formatDate } from '@/lib/format';
+import { WHATSAPP_NUMBER } from '@/lib/constants';
 import type { Order, OrderItem } from '@/lib/types';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -265,6 +266,19 @@ function OrderTrackingCard({ order }: { order: Order }) {
               Tracking information will be available once your order ships.
             </div>
           </div>
+        )}
+
+        {/* WhatsApp support for this order */}
+        {WHATSAPP_NUMBER && (
+          <a
+            href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Everything Store, I need help with order #${order.order_number}.`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#25D366] bg-[#25D366]/5 px-4 py-2.5 text-sm font-medium text-[#25D366] transition-colors hover:bg-[#25D366]/10"
+          >
+            <MessageCircle className="h-4 w-4" />
+            Need help? Chat on WhatsApp
+          </a>
         )}
       </CardContent>
     </Card>

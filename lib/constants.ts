@@ -95,3 +95,6 @@ export const PAYFAST_URL = PAYFAST_SANDBOX
 export const PAYFAST_VALIDATE_URL = PAYFAST_SANDBOX
   ? 'https://sandbox.payfast.co.za/eng/query/validate'
   : 'https://www.payfast.co.za/eng/query/validate';
+
+export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
+export const WHATSAPP_DEFAULT_MESSAGE = 'Hello Everything Store, I need help with a product.';

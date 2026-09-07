@@ -4,6 +4,7 @@ import './globals.css';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
 import { CartProvider } from '@/hooks/use-cart';
+import { WhatsAppWidget } from '@/components/whatsapp-widget';
 import { SITE_NAME, SITE_TAGLINE, SITE_URL } from '@/lib/constants';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -42,6 +43,7 @@ export default function RootLayout({
           <SiteHeader />
           <main className="flex-1">{children}</main>
           <SiteFooter />
+          <WhatsAppWidget />
         </CartProvider>
       </body>
     </html>

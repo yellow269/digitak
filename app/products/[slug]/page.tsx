@@ -2,14 +2,14 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { Star, ShieldCheck, CheckCircle2, ArrowLeft, Link2, Truck } from 'lucide-react';
+import { Star, ShieldCheck, CheckCircle2, ArrowLeft, Link2, Truck, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { createPublicSupabaseClient } from '@/lib/supabase/server';
 import { PUBLIC_PRODUCT_COLUMNS } from '@/lib/queries';
 import { formatPrice } from '@/lib/format';
-import { AFFILIATE_DISCLOSURE_SHORT, SITE_NAME } from '@/lib/constants';
+import { AFFILIATE_DISCLOSURE_SHORT, SITE_NAME, WHATSAPP_NUMBER } from '@/lib/constants';
 import type { Product } from '@/lib/types';
 import { ProductActions } from '@/components/product-actions';
 
@@ -223,6 +223,19 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           <div className="mt-6">
             <ProductActions product={product} isAffiliate={isAffiliate} />
           </div>
+
+          {/* WhatsApp product enquiry */}
+          {WHATSAPP_NUMBER && (
+            <a
+              href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Everything Store, I'm interested in ${product.name}.`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-[#25D366] bg-[#25D366]/5 px-4 py-2.5 text-sm font-medium text-[#25D366] transition-colors hover:bg-[#25D366]/10"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Ask about this product on WhatsApp
+            </a>
+          )}
 
           {isAffiliate && (
             <p className="mt-3 text-xs text-slate-500">
