@@ -224,6 +224,9 @@ export type Order = {
   tracking_url: string | null;
   supplier_notes: string | null;
   notes: string | null;
+  paid_at: string | null;
+  fulfillment_error: string | null;
+  fulfillment_error_at: string | null;
   created_at: string;
   updated_at: string;
   items?: OrderItem[];

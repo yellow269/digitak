@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Package, Search, Truck, ExternalLink, Loader2, Clock } from 'lucide-react';
+import { Package, Search, Truck, ExternalLink, Loader2, Clock, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
 import { formatPrice, formatDate } from '@/lib/format';
 import type { Order, OrderItem } from '@/lib/types';
-import type { OrderStatus } from '@/lib/types';
 
 const STATUS_LABELS: Record<string, string> = {
   pending_payment: 'Pending Payment',
@@ -21,6 +20,20 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
   refunded: 'Refunded',
 };
+
+// Status flow steps — only shows stages up to current status
+const STATUS_FLOW = [
+  { key: 'pending_payment', label: 'Order Placed', icon: Clock },
+  { key: 'paid', label: 'Payment Confirmed', icon: CheckCircle },
+  { key: 'supplier_processing', label: 'Processing', icon: Package },
+  { key: 'shipped', label: 'Shipped', icon: Truck },
+  { key: 'delivered', label: 'Delivered', icon: CheckCircle },
+];
+
+function getFlowIndex(status: string): number {
+  const idx = STATUS_FLOW.findIndex((s) => s.key === status);
+  return idx >= 0 ? idx : -1;
+}
 
 export default function TrackOrderPage() {
   const [email, setEmail] = useState('');
@@ -105,7 +118,6 @@ export default function TrackOrderPage() {
         </CardContent>
       </Card>
 
-      {/* Results */}
       {searched && !loading && (
         <div className="mt-6 space-y-4">
           {orders.length === 0 ? (
@@ -128,6 +140,8 @@ export default function TrackOrderPage() {
 
 function OrderTrackingCard({ order }: { order: Order }) {
   const hasTracking = !!order.tracking_number;
+  const currentIdx = getFlowIndex(order.status);
+  const isCancelled = order.status === 'cancelled' || order.status === 'refunded';
 
   return (
     <Card>
@@ -138,14 +152,63 @@ function OrderTrackingCard({ order }: { order: Order }) {
             order.status === 'shipped' ? 'bg-indigo-100 text-indigo-800' :
             order.status === 'delivered' ? 'bg-green-100 text-green-800' :
             order.status === 'paid' ? 'bg-blue-100 text-blue-800' :
+            order.status === 'supplier_processing' ? 'bg-purple-100 text-purple-800' :
             order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+            order.status === 'refunded' ? 'bg-orange-100 text-orange-800' :
             'bg-slate-100 text-slate-800'
           }>
             {STATUS_LABELS[order.status] || order.status}
           </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
+        {/* Visual Progress Tracker */}
+        {!isCancelled && (
+          <div className="px-2">
+            <div className="relative flex items-center justify-between">
+              {/* Progress line */}
+              <div className="absolute left-0 right-0 top-5 h-0.5 bg-slate-200" />
+              <div
+                className="absolute left-0 top-5 h-0.5 bg-green-500 transition-all"
+                style={{ width: currentIdx >= 0 ? `${(currentIdx / (STATUS_FLOW.length - 1)) * 100}%` : '0%' }}
+              />
+
+              {STATUS_FLOW.map((step, i) => {
+                const isReached = i <= currentIdx;
+                const isCurrent = i === currentIdx;
+                const Icon = step.icon;
+                return (
+                  <div key={step.key} className="relative flex flex-col items-center z-10">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors ${
+                      isReached
+                        ? isCurrent
+                          ? 'border-green-500 bg-green-500 text-white'
+                          : 'border-green-500 bg-green-50 text-green-600'
+                        : 'border-slate-300 bg-white text-slate-400'
+                    }`}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <span className={`mt-2 text-xs text-center max-w-[70px] ${
+                      isReached ? 'font-medium text-slate-900' : 'text-slate-400'
+                    }`}>
+                      {step.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Cancelled/Refunded notice */}
+        {isCancelled && (
+          <div className={`rounded-lg border p-4 text-sm ${
+            order.status === 'cancelled' ? 'border-red-200 bg-red-50 text-red-700' : 'border-orange-200 bg-orange-50 text-orange-700'
+          }`}>
+            This order has been {order.status === 'cancelled' ? 'cancelled' : 'refunded'}.
+          </div>
+        )}
+
         {/* Order summary */}
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
@@ -156,6 +219,14 @@ function OrderTrackingCard({ order }: { order: Order }) {
             <p className="text-slate-500">Total</p>
             <p className="font-medium">{formatPrice(order.total, 'ZAR')}</p>
           </div>
+        </div>
+
+        {/* Shipping info */}
+        <div className="text-sm">
+          <p className="text-slate-500">Shipping to</p>
+          <p className="font-medium">{order.customer_name}</p>
+          <p className="text-slate-600">{order.shipping_address}</p>
+          <p className="text-slate-600">{order.shipping_city}, {order.shipping_province} {order.shipping_postal_code}</p>
         </div>
 
         {/* Tracking info */}
