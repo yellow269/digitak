@@ -1,13 +1,15 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, Pencil, ExternalLink, Upload, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, ExternalLink, Upload, RefreshCw, Loader2, Package } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { Input } from '@/components/ui/input';
+import { createClient } from '@/lib/supabase/client';
 import { formatPrice, formatDate } from '@/lib/format';
 import type { Product } from '@/lib/types';
-
-export const dynamic = 'force-dynamic';
 
 const TYPE_BADGES: Record<string, string> = {
   affiliate: 'bg-blue-100 text-blue-800',
@@ -16,18 +18,39 @@ const TYPE_BADGES: Record<string, string> = {
   manual: 'bg-orange-100 text-orange-800',
 };
 
-export default async function AdminProductsPage() {
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from('products')
-    .select('*, category:categories(*)')
-    .order('created_at', { ascending: false });
+export default function AdminProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  if (error) {
-    console.error('[AdminProducts] Fetch error:', error.message);
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  async function fetchProducts() {
+    setLoading(true);
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, category:categories(*)')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[AdminProducts] Fetch error:', error.message);
+    }
+
+    setProducts((data as unknown as Product[]) || []);
+    setLoading(false);
   }
 
-  const products = (data as unknown as Product[]) || [];
+  const filtered = searchQuery.trim()
+    ? products.filter(
+        (p) =>
+          p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.slug?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.vendor_name?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : products;
 
   return (
     <div className="space-y-6">
@@ -58,13 +81,29 @@ export default async function AdminProductsPage() {
         </div>
       </div>
 
-      {products.length === 0 ? (
+      <div className="relative">
+        <Input
+          placeholder="Search products..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+        </div>
+      ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <p className="text-slate-500">No products yet.</p>
-            <Button asChild className="mt-4">
-              <Link href="/admin/products/new">Add your first product</Link>
-            </Button>
+            <Package className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+            <p className="text-slate-500">{searchQuery ? 'No products match your search.' : 'No products yet.'}</p>
+            {!searchQuery && (
+              <Button asChild className="mt-4">
+                <Link href="/admin/products/new">Add your first product</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -82,7 +121,7 @@ export default async function AdminProductsPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {products.map((p) => (
+              {filtered.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
