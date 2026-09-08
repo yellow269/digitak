@@ -257,6 +257,49 @@ export type OrderItem = {
 };
 
 // ============================================================
+// SHIPMENT TYPES
+// ============================================================
+export type ShipmentStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+
+export const SHIPMENT_STATUSES: { value: ShipmentStatus; label: string }[] = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'shipped', label: 'Shipped' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+export type Shipment = {
+  id: string;
+  order_id: string;
+  order_number: number;
+  supplier_id: string | null;
+  supplier_name: string | null;
+  status: ShipmentStatus;
+  courier: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  shipping_cost: number;
+  supplier_order_id: string | null;
+  supplier_shipment_id: string | null;
+  shipped_at: string | null;
+  delivered_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  items?: ShipmentItem[];
+};
+
+export type ShipmentItem = {
+  id: string;
+  shipment_id: string;
+  order_item_id: string;
+  quantity: number;
+  created_at: string;
+  order_item?: OrderItem;
+};
+
+// ============================================================
 // CART TYPES
 // ============================================================
 export type CartItem = {

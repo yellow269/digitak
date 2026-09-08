@@ -1,26 +1,28 @@
 /**
  * Supplier fulfillment service.
  *
- * Creates supplier_fulfillments records from paid orders.
+ * Creates supplier_fulfillments AND shipments records from paid orders.
  * Handles stock validation, data snapshots, idempotency, and error states.
  *
  * Called by the PayFast notification handler after payment is confirmed.
  */
 
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import type { ShipmentStatus } from '@/lib/types';
 
 type SupabaseClient = ReturnType<typeof createServiceRoleClient>;
 
 export type FulfillmentResult = {
   success: boolean;
   fulfillmentId?: string;
+  shipmentIds?: string[];
   skipped?: boolean;
   error?: string;
   stockIssues?: string[];
 };
 
 /**
- * Process a paid order: validate stock, create fulfillment records, update status.
+ * Process a paid order: validate stock, create fulfillment + shipment records, update status.
  * Idempotent — safe to call multiple times for the same order.
  */
 export async function processPaidOrder(orderId: string): Promise<FulfillmentResult> {
@@ -45,6 +47,16 @@ export async function processPaidOrder(orderId: string): Promise<FulfillmentResu
 
   const existingSupplierIds = new Set(
     (existingFulfillments || []).map((f) => f.supplier_id)
+  );
+
+  // 2b. Check if shipments already exist (idempotency)
+  const { data: existingShipments } = await supabase
+    .from('shipments')
+    .select('id, supplier_id')
+    .eq('order_id', orderId);
+
+  const existingShipmentSupplierIds = new Set(
+    (existingShipments || []).map((s) => s.supplier_id)
   );
 
   // 3. Fetch order items with supplier info
@@ -93,7 +105,21 @@ export async function processPaidOrder(orderId: string): Promise<FulfillmentResu
     }
   }
 
-  // 6. Create fulfillment records (one per item per supplier)
+  // 6. Group items by supplier for fulfillment records
+  const itemsBySupplier = new Map<string, typeof items>();
+  const unsuppliedItems: typeof items = [];
+
+  for (const item of items) {
+    if (item.supplier_id) {
+      const list = itemsBySupplier.get(item.supplier_id) || [];
+      list.push(item);
+      itemsBySupplier.set(item.supplier_id, list);
+    } else {
+      unsuppliedItems.push(item);
+    }
+  }
+
+  // 7. Create fulfillment records (one per item per supplier)
   const stockIssues: string[] = [];
   const fulfillments: Record<string, unknown>[] = [];
 
@@ -131,7 +157,6 @@ export async function processPaidOrder(orderId: string): Promise<FulfillmentResu
             stockError = `Insufficient stock for variant "${variantKey}": need ${item.quantity}, have ${variant.stock}`;
           }
         }
-        // If variant doesn't exist in variant_stock, we allow it (product-level stock applies)
       }
     }
 
@@ -148,7 +173,7 @@ export async function processPaidOrder(orderId: string): Promise<FulfillmentResu
       product_id: item.product_id,
       product_name: item.product_name,
       product_image: item.product_image,
-      supplier_handle: null, // Will be populated from product if available
+      supplier_handle: null,
       supplier_sku: item.supplier_sku,
       variant_sku: item.variant_sku,
       selected_options: item.selected_options,
@@ -171,7 +196,7 @@ export async function processPaidOrder(orderId: string): Promise<FulfillmentResu
     fulfillments.push(fulfillment);
   }
 
-  // 7. Insert fulfillment records
+  // 8. Insert fulfillment records
   let createdId: string | undefined;
 
   if (fulfillments.length > 0) {
@@ -181,7 +206,6 @@ export async function processPaidOrder(orderId: string): Promise<FulfillmentResu
       .select('id');
 
     if (insertErr) {
-      // Check if it's a unique constraint violation (already exists)
       if (insertErr.message?.includes('duplicate key')) {
         return { success: true, skipped: true };
       }
@@ -191,17 +215,79 @@ export async function processPaidOrder(orderId: string): Promise<FulfillmentResu
     createdId = inserted?.[0]?.id;
   }
 
-  // 8. Update order status to supplier_processing
+  // 9. Create shipment records (one per supplier)
+  const shipmentIds: string[] = [];
+
+  for (const [supplierId, supplierItems] of itemsBySupplier) {
+    // Skip if shipment already exists for this order+supplier
+    if (existingShipmentSupplierIds.has(supplierId)) continue;
+
+    const supplier = supplierMap.get(supplierId);
+    if (!supplier) continue;
+
+    // Check if any items have stock issues
+    const hasStockIssue = supplierItems.some((item) => {
+      const product = item.product_id ? productMap.get(item.product_id) : null;
+      if (!product) return false;
+      if (product.stock_status === 'out_of_stock' && product.quantity_available <= 0) return true;
+      if (product.variant_stock && item.selected_options && Object.keys(item.selected_options).length > 0) {
+        const variantKey = Object.entries(item.selected_options as Record<string, { name: string; hex?: string }>)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([k, v]) => `${k}=${v.name}`)
+          .join(':');
+        const variant = product.variant_stock[variantKey];
+        if (variant && variant.stock < item.quantity) return true;
+      }
+      return false;
+    });
+
+    const shipmentStatus: ShipmentStatus = hasStockIssue ? 'pending' : 'processing';
+
+    // Calculate supplier cost for this shipment
+    const supplierCost = supplierItems.reduce((sum, item) => {
+      return sum + (item.supplier_cost ? item.supplier_cost * item.quantity : 0);
+    }, 0);
+
+    const { data: shipment, error: shipmentErr } = await supabase
+      .from('shipments')
+      .insert({
+        order_id: orderId,
+        order_number: order.order_number,
+        supplier_id: supplierId,
+        supplier_name: supplier.name,
+        status: shipmentStatus,
+        shipping_cost: 0,
+      })
+      .select('id')
+      .single();
+
+    if (shipmentErr) {
+      if (shipmentErr.message?.includes('duplicate key')) continue;
+      console.error(`[Fulfillment] Failed to create shipment for supplier ${supplier.name}:`, shipmentErr.message);
+      continue;
+    }
+
+    shipmentIds.push(shipment.id);
+
+    // Create shipment items
+    const shipmentItems = supplierItems.map((item) => ({
+      shipment_id: shipment.id,
+      order_item_id: item.id,
+      quantity: item.quantity,
+    }));
+
+    await supabase.from('shipment_items').insert(shipmentItems);
+  }
+
+  // 10. Update order status to supplier_processing
   const orderUpdate: Record<string, unknown> = {
     status: 'supplier_processing',
   };
 
-  // Set paid_at if not already set
   if (!order.paid_at) {
     orderUpdate.paid_at = new Date().toISOString();
   }
 
-  // If there are stock issues, record them on the order
   if (stockIssues.length > 0) {
     orderUpdate.fulfillment_error = stockIssues.join('; ');
     orderUpdate.fulfillment_error_at = new Date().toISOString();
@@ -212,7 +298,7 @@ export async function processPaidOrder(orderId: string): Promise<FulfillmentResu
     .update(orderUpdate)
     .eq('id', orderId);
 
-  // 9. Create admin notification
+  // 11. Create admin notification
   await createAdminNotification(supabase, {
     type: stockIssues.length > 0 ? 'fulfillment_stock_issue' : 'new_paid_order',
     title: stockIssues.length > 0
@@ -228,6 +314,7 @@ export async function processPaidOrder(orderId: string): Promise<FulfillmentResu
   return {
     success: true,
     fulfillmentId: createdId,
+    shipmentIds: shipmentIds.length > 0 ? shipmentIds : undefined,
     stockIssues: stockIssues.length > 0 ? stockIssues : undefined,
   };
 }
@@ -257,6 +344,91 @@ export async function retryFulfillment(orderId: string): Promise<FulfillmentResu
 
   // Re-process
   return processPaidOrder(orderId);
+}
+
+/**
+ * Update shipment status. Sets shipped_at/delivered_at timestamps.
+ * Does NOT update the parent order status — that should be derived separately.
+ */
+export async function updateShipmentStatus(
+  shipmentId: string,
+  status: ShipmentStatus
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = createServiceRoleClient();
+
+  const update: Record<string, unknown> = { status };
+
+  if (status === 'shipped') {
+    update.shipped_at = new Date().toISOString();
+  } else if (status === 'delivered') {
+    update.delivered_at = new Date().toISOString();
+  }
+
+  const { error } = await supabase
+    .from('shipments')
+    .update(update)
+    .eq('id', shipmentId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  // Derive order status from all shipments
+  const { data: shipment } = await supabase
+    .from('shipments')
+    .select('order_id')
+    .eq('id', shipmentId)
+    .single();
+
+  if (shipment) {
+    await deriveOrderStatusFromShipments(shipment.order_id);
+  }
+
+  return { success: true };
+}
+
+/**
+ * Derive the overall order status from its shipments.
+ * All cancelled → Cancelled. All delivered → Delivered.
+ * Mix → Partially Shipped/Delivered. None shipped → Supplier Processing.
+ */
+export async function deriveOrderStatusFromShipments(orderId: string): Promise<void> {
+  const supabase = createServiceRoleClient();
+
+  const { data: shipments } = await supabase
+    .from('shipments')
+    .select('status')
+    .eq('order_id', orderId);
+
+  if (!shipments || shipments.length === 0) return;
+
+  const statuses = shipments.map((s) => s.status);
+  const allDelivered = statuses.every((s) => s === 'delivered');
+  const allCancelled = statuses.every((s) => s === 'cancelled');
+  const anyShipped = statuses.some((s) => s === 'shipped');
+  const anyDelivered = statuses.some((s) => s === 'delivered');
+  const anyProcessing = statuses.some((s) => s === 'processing' || s === 'pending');
+
+  let orderStatus: string;
+
+  if (allCancelled) {
+    orderStatus = 'cancelled';
+  } else if (allDelivered) {
+    orderStatus = 'delivered';
+  } else if (anyDelivered || (anyShipped && anyDelivered)) {
+    orderStatus = 'delivered'; // Partially delivered still shows as delivered at order level
+  } else if (anyShipped) {
+    orderStatus = 'shipped';
+  } else if (anyProcessing) {
+    orderStatus = 'supplier_processing';
+  } else {
+    orderStatus = 'supplier_processing';
+  }
+
+  await supabase
+    .from('orders')
+    .update({ status: orderStatus })
+    .eq('id', orderId);
 }
 
 /**
@@ -291,7 +463,6 @@ function formatCurrency(amount: number): string {
 
 /**
  * Email event hooks (architecture ready for Stage 2).
- * These are placeholders that log the event. Replace with actual email sending later.
  */
 export const EMAIL_EVENTS = {
   ORDER_CONFIRMED: 'order_confirmed',
@@ -313,6 +484,5 @@ export function emitEmailEvent(
     [key: string]: unknown;
   }
 ) {
-  // Log for now — implement email provider in Stage 2
   console.log(`[EmailEvent] ${event}: Order #${data.orderNumber} → ${data.customerEmail}`);
 }

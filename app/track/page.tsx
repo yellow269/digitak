@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Package, Search, Truck, ExternalLink, Loader2, Clock, CheckCircle, MessageCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Package, Search, Truck, ExternalLink, Loader2, Clock, CheckCircle, MessageCircle, Box } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,9 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
 import { formatPrice, formatDate } from '@/lib/format';
 import { WHATSAPP_NUMBER } from '@/lib/constants';
-import type { Order, OrderItem } from '@/lib/types';
+import type { Order, OrderItem, Shipment, ShipmentItem } from '@/lib/types';
 
-const STATUS_LABELS: Record<string, string> = {
+const ORDER_STATUS_LABELS: Record<string, string> = {
   pending_payment: 'Pending Payment',
   paid: 'Paid',
   supplier_processing: 'Processing',
@@ -22,19 +22,30 @@ const STATUS_LABELS: Record<string, string> = {
   refunded: 'Refunded',
 };
 
-// Status flow steps — only shows stages up to current status
-const STATUS_FLOW = [
-  { key: 'pending_payment', label: 'Order Placed', icon: Clock },
-  { key: 'paid', label: 'Payment Confirmed', icon: CheckCircle },
-  { key: 'supplier_processing', label: 'Processing', icon: Package },
+const SHIPMENT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  processing: 'Processing',
+  shipped: 'Shipped',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+};
+
+const SHIPMENT_FLOW = [
+  { key: 'processing', label: 'Processing', icon: Package },
   { key: 'shipped', label: 'Shipped', icon: Truck },
   { key: 'delivered', label: 'Delivered', icon: CheckCircle },
 ];
 
-function getFlowIndex(status: string): number {
-  const idx = STATUS_FLOW.findIndex((s) => s.key === status);
-  return idx >= 0 ? idx : -1;
+function getShipmentFlowIndex(status: string): number {
+  const idx = SHIPMENT_FLOW.findIndex((s) => s.key === status);
+  if (idx >= 0) return idx;
+  if (status === 'pending') return -1;
+  return -1;
 }
+
+type ShipmentWithItems = Shipment & {
+  shipment_items?: (ShipmentItem & { order_item?: OrderItem })[];
+};
 
 export default function TrackOrderPage() {
   const [email, setEmail] = useState('');
@@ -140,9 +151,25 @@ export default function TrackOrderPage() {
 }
 
 function OrderTrackingCard({ order }: { order: Order }) {
-  const hasTracking = !!order.tracking_number;
-  const currentIdx = getFlowIndex(order.status);
+  const [shipments, setShipments] = useState<ShipmentWithItems[]>([]);
+  const [loadingShipments, setLoadingShipments] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('shipments')
+        .select('*, shipment_items(*, order_item:order_items(*))')
+        .eq('order_id', order.id)
+        .order('created_at');
+      setShipments((data as ShipmentWithItems[]) || []);
+      setLoadingShipments(false);
+    }
+    load();
+  }, [order.id]);
+
   const isCancelled = order.status === 'cancelled' || order.status === 'refunded';
+  const hasShipments = shipments.length > 0;
 
   return (
     <Card>
@@ -158,49 +185,11 @@ function OrderTrackingCard({ order }: { order: Order }) {
             order.status === 'refunded' ? 'bg-orange-100 text-orange-800' :
             'bg-slate-100 text-slate-800'
           }>
-            {STATUS_LABELS[order.status] || order.status}
+            {ORDER_STATUS_LABELS[order.status] || order.status}
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Visual Progress Tracker */}
-        {!isCancelled && (
-          <div className="px-2">
-            <div className="relative flex items-center justify-between">
-              {/* Progress line */}
-              <div className="absolute left-0 right-0 top-5 h-0.5 bg-slate-200" />
-              <div
-                className="absolute left-0 top-5 h-0.5 bg-green-500 transition-all"
-                style={{ width: currentIdx >= 0 ? `${(currentIdx / (STATUS_FLOW.length - 1)) * 100}%` : '0%' }}
-              />
-
-              {STATUS_FLOW.map((step, i) => {
-                const isReached = i <= currentIdx;
-                const isCurrent = i === currentIdx;
-                const Icon = step.icon;
-                return (
-                  <div key={step.key} className="relative flex flex-col items-center z-10">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors ${
-                      isReached
-                        ? isCurrent
-                          ? 'border-green-500 bg-green-500 text-white'
-                          : 'border-green-500 bg-green-50 text-green-600'
-                        : 'border-slate-300 bg-white text-slate-400'
-                    }`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <span className={`mt-2 text-xs text-center max-w-[70px] ${
-                      isReached ? 'font-medium text-slate-900' : 'text-slate-400'
-                    }`}>
-                      {step.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Cancelled/Refunded notice */}
         {isCancelled && (
           <div className={`rounded-lg border p-4 text-sm ${
@@ -230,45 +219,31 @@ function OrderTrackingCard({ order }: { order: Order }) {
           <p className="text-slate-600">{order.shipping_city}, {order.shipping_province} {order.shipping_postal_code}</p>
         </div>
 
-        {/* Tracking info */}
-        {hasTracking ? (
-          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-2">
-            <div className="flex items-center gap-2 text-sm font-medium text-indigo-800">
-              <Truck className="h-4 w-4" />
-              Shipping Details
-            </div>
-            {order.courier_name && (
-              <div className="text-sm">
-                <span className="text-indigo-600">Courier:</span>{' '}
-                <span className="font-medium">{order.courier_name}</span>
-              </div>
-            )}
-            <div className="text-sm">
-              <span className="text-indigo-600">Tracking Number:</span>{' '}
-              <span className="font-mono font-medium">{order.tracking_number}</span>
-            </div>
-            {order.tracking_url && (
-              <a
-                href={order.tracking_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 hover:text-indigo-900 underline"
-              >
-                Track Order
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            )}
+        {/* Shipments */}
+        {loadingShipments ? (
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading shipment details...
+          </div>
+        ) : hasShipments ? (
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-slate-700 flex items-center gap-2">
+              <Box className="h-4 w-4" /> Shipments ({shipments.length})
+            </h3>
+            {shipments.map((shipment, idx) => (
+              <ShipmentTrackingCard
+                key={shipment.id}
+                shipment={shipment}
+                index={idx + 1}
+                orderNumber={order.order_number}
+              />
+            ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <Clock className="h-4 w-4" />
-              Tracking information will be available once your order ships.
-            </div>
-          </div>
+          /* Fallback: show old-style tracking from order-level fields */
+          <OrderLevelTracking order={order} />
         )}
 
-        {/* WhatsApp support for this order */}
+        {/* WhatsApp support */}
         {WHATSAPP_NUMBER && (
           <a
             href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Everything Store, I need help with order #${order.order_number}.`)}`}
@@ -282,5 +257,194 @@ function OrderTrackingCard({ order }: { order: Order }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function ShipmentTrackingCard({
+  shipment,
+  index,
+  orderNumber,
+}: {
+  shipment: ShipmentWithItems;
+  index: number;
+  orderNumber: number;
+}) {
+  const items = shipment.shipment_items || [];
+  const flowIdx = getShipmentFlowIndex(shipment.status);
+  const hasTracking = !!shipment.tracking_number;
+  const isCancelled = shipment.status === 'cancelled';
+
+  return (
+    <div className="rounded-lg border bg-slate-50 p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Box className="h-4 w-4 text-slate-500" />
+          <span className="font-medium text-slate-900">Shipment #{index}</span>
+          {shipment.supplier_name && (
+            <span className="text-sm text-slate-500">· {shipment.supplier_name}</span>
+          )}
+        </div>
+        <Badge className={
+          shipment.status === 'shipped' ? 'bg-indigo-100 text-indigo-800' :
+          shipment.status === 'delivered' ? 'bg-green-100 text-green-800' :
+          shipment.status === 'processing' ? 'bg-purple-100 text-purple-800' :
+          shipment.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+          'bg-slate-100 text-slate-800'
+        }>
+          {SHIPMENT_STATUS_LABELS[shipment.status] || shipment.status}
+        </Badge>
+      </div>
+
+      {/* Items */}
+      {items.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-slate-500">Products:</p>
+          {items.map((si) => {
+            const item = si.order_item;
+            if (!item) return null;
+            return (
+              <div key={si.id} className="flex items-center gap-2 text-sm text-slate-700">
+                <span className="truncate">{item.product_name}</span>
+                {item.selected_options && (
+                  <span className="text-xs text-slate-400">
+                    ({Object.values(item.selected_options).map((v) => v.name).join(', ')})
+                  </span>
+                )}
+                <span className="text-xs text-slate-400">× {si.quantity}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Progress tracker */}
+      {!isCancelled && (
+        <div className="px-1">
+          <div className="relative flex items-center justify-between">
+            <div className="absolute left-0 right-0 top-4 h-0.5 bg-slate-200" />
+            <div
+              className="absolute left-0 top-4 h-0.5 bg-green-500 transition-all"
+              style={{ width: flowIdx >= 0 ? `${(flowIdx / (SHIPMENT_FLOW.length - 1)) * 100}%` : '0%' }}
+            />
+            {SHIPMENT_FLOW.map((step, i) => {
+              const isReached = i <= flowIdx;
+              const isCurrent = i === flowIdx;
+              const Icon = step.icon;
+              return (
+                <div key={step.key} className="relative flex flex-col items-center z-10">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors ${
+                    isReached
+                      ? isCurrent
+                        ? 'border-green-500 bg-green-500 text-white'
+                        : 'border-green-500 bg-green-50 text-green-600'
+                      : 'border-slate-300 bg-white text-slate-400'
+                  }`}>
+                    <Icon className="h-3.5 w-3.5" />
+                  </div>
+                  <span className={`mt-1.5 text-xs text-center max-w-[60px] ${
+                    isReached ? 'font-medium text-slate-900' : 'text-slate-400'
+                  }`}>
+                    {step.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Tracking info */}
+      {hasTracking ? (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 space-y-1.5">
+          <div className="flex items-center gap-2 text-sm font-medium text-indigo-800">
+            <Truck className="h-4 w-4" />
+            Shipping Details
+          </div>
+          {shipment.courier && (
+            <div className="text-sm">
+              <span className="text-indigo-600">Courier:</span>{' '}
+              <span className="font-medium">{shipment.courier}</span>
+            </div>
+          )}
+          <div className="text-sm">
+            <span className="text-indigo-600">Tracking Number:</span>{' '}
+            <span className="font-mono font-medium">{shipment.tracking_number}</span>
+          </div>
+          {shipment.tracking_url && (
+            <a
+              href={shipment.tracking_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 hover:text-indigo-900 underline"
+            >
+              Track Shipment
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <Clock className="h-4 w-4" />
+            Tracking information will be available once this shipment ships.
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp for this shipment */}
+      {WHATSAPP_NUMBER && (
+        <a
+          href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Everything Store, I need help with order #${orderNumber}, shipment #${index}.`)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#25D366]/30 bg-[#25D366]/5 px-3 py-2 text-xs font-medium text-[#25D366] transition-colors hover:bg-[#25D366]/10"
+        >
+          <MessageCircle className="h-3.5 w-3.5" />
+          Need help with this shipment? Chat on WhatsApp
+        </a>
+      )}
+    </div>
+  );
+}
+
+function OrderLevelTracking({ order }: { order: Order }) {
+  const hasTracking = !!order.tracking_number;
+
+  return hasTracking ? (
+    <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-2">
+      <div className="flex items-center gap-2 text-sm font-medium text-indigo-800">
+        <Truck className="h-4 w-4" />
+        Shipping Details
+      </div>
+      {order.courier_name && (
+        <div className="text-sm">
+          <span className="text-indigo-600">Courier:</span>{' '}
+          <span className="font-medium">{order.courier_name}</span>
+        </div>
+      )}
+      <div className="text-sm">
+        <span className="text-indigo-600">Tracking Number:</span>{' '}
+        <span className="font-mono font-medium">{order.tracking_number}</span>
+      </div>
+      {order.tracking_url && (
+        <a
+          href={order.tracking_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-sm font-medium text-indigo-700 hover:text-indigo-900 underline"
+        >
+          Track Order
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
+      )}
+    </div>
+  ) : (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <div className="flex items-center gap-2 text-sm text-slate-500">
+        <Clock className="h-4 w-4" />
+        Tracking information will be available once your order ships.
+      </div>
+    </div>
   );
 }

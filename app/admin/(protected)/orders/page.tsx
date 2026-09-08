@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Loader2, Package, Truck, CheckCircle, XCircle, Clock,
-  AlertTriangle, RefreshCw, Search, ChevronDown,
+  AlertTriangle, RefreshCw, Search, Box,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
 import { formatPrice, formatDate } from '@/lib/format';
-import { ORDER_STATUSES } from '@/lib/constants';
-import type { Order, OrderItem, OrderStatus } from '@/lib/types';
+import { ORDER_STATUSES, SHIPMENT_STATUSES } from '@/lib/constants';
+import type { Order, OrderItem, OrderStatus, Shipment, ShipmentStatus } from '@/lib/types';
 
 type SupplierFulfillment = {
   id: string;
@@ -41,6 +41,10 @@ type SupplierFulfillment = {
   error_at: string | null;
   notes: string | null;
   created_at: string;
+};
+
+type ShipmentWithItems = Shipment & {
+  shipment_items?: { id: string; order_item_id: string; quantity: number; order_item?: OrderItem }[];
 };
 
 const COURIERS = [
@@ -69,6 +73,14 @@ const STATUS_COLORS: Record<string, string> = {
   refunded: 'bg-orange-100 text-orange-800',
 };
 
+const SHIPMENT_STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-slate-100 text-slate-800',
+  processing: 'bg-purple-100 text-purple-800',
+  shipped: 'bg-indigo-100 text-indigo-800',
+  delivered: 'bg-green-100 text-green-800',
+  cancelled: 'bg-red-100 text-red-800',
+};
+
 const FULFILLMENT_STATUS_COLORS: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800',
   sent_to_supplier: 'bg-blue-100 text-blue-800',
@@ -80,6 +92,10 @@ const FULFILLMENT_STATUS_COLORS: Record<string, string> = {
 
 function getStatusBadge(status: OrderStatus | string) {
   return <Badge className={STATUS_COLORS[status] || 'bg-slate-100 text-slate-800'}>{ORDER_STATUSES.find((s) => s.value === status)?.label || status}</Badge>;
+}
+
+function getShipmentBadge(status: string) {
+  return <Badge className={SHIPMENT_STATUS_COLORS[status] || 'bg-slate-100 text-slate-800'}>{SHIPMENT_STATUSES.find((s) => s.value === status)?.label || status}</Badge>;
 }
 
 function getFulfillmentBadge(status: string) {
@@ -96,29 +112,20 @@ export default function OrdersPage() {
   const [fulfillments, setFulfillments] = useState<SupplierFulfillment[]>([]);
   const [loadingFulfillments, setLoadingFulfillments] = useState(false);
   const [retryingFulfillment, setRetryingFulfillment] = useState(false);
+  const [shipments, setShipments] = useState<ShipmentWithItems[]>([]);
+  const [loadingShipments, setLoadingShipments] = useState(false);
 
-  // Tracking state
-  const [trackingCourier, setTrackingCourier] = useState('');
-  const [trackingNumber, setTrackingNumber] = useState('');
-  const [trackingUrl, setTrackingUrl] = useState('');
-  const [customCourier, setCustomCourier] = useState('');
-  const [savingTracking, setSavingTracking] = useState(false);
+  // Tracking state for shipments
+  const [editingShipment, setEditingShipment] = useState<ShipmentWithItems | null>(null);
+  const [editCourier, setEditCourier] = useState('');
+  const [editCustomCourier, setEditCustomCourier] = useState('');
+  const [editTrackingNumber, setEditTrackingNumber] = useState('');
+  const [editTrackingUrl, setEditTrackingUrl] = useState('');
+  const [editSupplierOrderId, setEditSupplierOrderId] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [savingShipment, setSavingShipment] = useState(false);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [statusFilter]);
-
-  useEffect(() => {
-    if (selectedOrder) {
-      setTrackingCourier(selectedOrder.courier_name || '');
-      setTrackingNumber(selectedOrder.tracking_number || '');
-      setTrackingUrl(selectedOrder.tracking_url || '');
-      setCustomCourier('');
-      loadFulfillments(selectedOrder.id);
-    }
-  }, [selectedOrder]);
-
-  async function fetchOrders() {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
     let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
@@ -138,7 +145,18 @@ export default function OrdersPage() {
     }
     setOrders(filtered);
     setLoading(false);
-  }
+  }, [statusFilter, searchQuery]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    if (selectedOrder) {
+      loadFulfillments(selectedOrder.id);
+      loadShipments(selectedOrder.id);
+    }
+  }, [selectedOrder]);
 
   async function loadFulfillments(orderId: string) {
     setLoadingFulfillments(true);
@@ -150,6 +168,18 @@ export default function OrdersPage() {
       .order('created_at');
     setFulfillments((data as SupplierFulfillment[]) || []);
     setLoadingFulfillments(false);
+  }
+
+  async function loadShipments(orderId: string) {
+    setLoadingShipments(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('shipments')
+      .select('*, shipment_items(*, order_item:order_items(*))')
+      .eq('order_id', orderId)
+      .order('created_at');
+    setShipments((data as ShipmentWithItems[]) || []);
+    setLoadingShipments(false);
   }
 
   async function updateOrderStatus(orderId: string, status: OrderStatus) {
@@ -174,11 +204,11 @@ export default function OrdersPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Retry failed');
-      // Refresh order and fulfillments
       const supabase = createClient();
       const { data: updatedOrder } = await supabase.from('orders').select('*').eq('id', selectedOrder.id).single();
       if (updatedOrder) setSelectedOrder(updatedOrder as Order);
       loadFulfillments(selectedOrder.id);
+      loadShipments(selectedOrder.id);
       fetchOrders();
     } catch (err) {
       console.error('Retry failed:', err);
@@ -186,23 +216,46 @@ export default function OrdersPage() {
     setRetryingFulfillment(false);
   }
 
-  async function saveTrackingInfo() {
-    if (!selectedOrder) return;
-    setSavingTracking(true);
+  async function saveShipmentTracking() {
+    if (!editingShipment) return;
+    setSavingShipment(true);
+    const courier = editCourier === '_own courier_' ? editCustomCourier : editCourier;
     const supabase = createClient();
-    const courier = trackingCourier === '_own courier_' ? customCourier : trackingCourier;
-    await supabase.from('orders').update({
-      courier_name: courier || null,
-      tracking_number: trackingNumber || null,
-      tracking_url: trackingUrl || null,
-    }).eq('id', selectedOrder.id);
-    setSelectedOrder({
-      ...selectedOrder,
-      courier_name: courier || null,
-      tracking_number: trackingNumber || null,
-      tracking_url: trackingUrl || null,
-    });
-    setSavingTracking(false);
+    await supabase.from('shipments').update({
+      courier: courier || null,
+      tracking_number: editTrackingNumber || null,
+      tracking_url: editTrackingUrl || null,
+      supplier_order_id: editSupplierOrderId || null,
+      notes: editNotes || null,
+    }).eq('id', editingShipment.id);
+    setEditingShipment(null);
+    if (selectedOrder) loadShipments(selectedOrder.id);
+    setSavingShipment(false);
+  }
+
+  async function handleShipmentStatusChange(shipmentId: string, status: ShipmentStatus) {
+    setUpdating(true);
+    try {
+      const res = await fetch('/api/admin/shipments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipmentId, status }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        console.error('Shipment update failed:', data.error);
+      }
+    } catch (err) {
+      console.error('Shipment update error:', err);
+    }
+    if (selectedOrder) {
+      loadShipments(selectedOrder.id);
+      const supabase = createClient();
+      const { data: updatedOrder } = await supabase.from('orders').select('*').eq('id', selectedOrder.id).single();
+      if (updatedOrder) setSelectedOrder(updatedOrder as Order);
+      fetchOrders();
+    }
+    setUpdating(false);
   }
 
   const filteredOrders = orders;
@@ -276,11 +329,6 @@ export default function OrdersPage() {
                       {order.payment_status === 'paid' && order.status !== 'paid' && (
                         <Badge className="bg-green-100 text-green-800">Paid</Badge>
                       )}
-                      {order.tracking_number && (
-                        <Badge variant="outline" className="gap-1 text-xs">
-                          <Truck className="h-3 w-3" /> Tracked
-                        </Badge>
-                      )}
                       {hasError && (
                         <Badge className="bg-red-100 text-red-800 gap-1">
                           <AlertTriangle className="h-3 w-3" /> Needs Attention
@@ -346,7 +394,7 @@ export default function OrdersPage() {
 
                 {/* Status Flow */}
                 <div>
-                  <h3 className="text-sm font-medium text-slate-500 mb-2">Status Flow</h3>
+                  <h3 className="text-sm font-medium text-slate-500 mb-2">Order Status</h3>
                   <div className="flex flex-wrap gap-2">
                     {ORDER_STATUSES.map((s) => (
                       <Button
@@ -409,16 +457,18 @@ export default function OrdersPage() {
                   </div>
                 </div>
 
-                {/* Supplier Fulfillment */}
+                {/* SHIPMENTS */}
                 <div>
-                  <h3 className="text-sm font-medium text-slate-500 mb-2">Supplier Fulfillment</h3>
-                  {loadingFulfillments ? (
+                  <h3 className="text-sm font-medium text-slate-500 mb-2 flex items-center gap-2">
+                    <Box className="h-4 w-4" /> Shipments
+                  </h3>
+                  {loadingShipments ? (
                     <div className="flex items-center gap-2 text-sm text-slate-500">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading shipments...
                     </div>
-                  ) : fulfillments.length === 0 ? (
+                  ) : shipments.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center">
-                      <p className="text-sm text-slate-500">No fulfillment records yet.</p>
+                      <p className="text-sm text-slate-500">No shipments yet.</p>
                       {(selectedOrder.status === 'paid' || selectedOrder.status === 'supplier_processing') && (
                         <Button
                           size="sm"
@@ -428,11 +478,38 @@ export default function OrdersPage() {
                           onClick={(e) => { e.stopPropagation(); retryFulfillment(); }}
                         >
                           {retryingFulfillment ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                          Create Fulfillment
+                          Create Shipments
                         </Button>
                       )}
                     </div>
                   ) : (
+                    <div className="space-y-3">
+                      {shipments.map((shipment, idx) => (
+                        <ShipmentCard
+                          key={shipment.id}
+                          shipment={shipment}
+                          index={idx + 1}
+                          onStatusChange={handleShipmentStatusChange}
+                          onEdit={() => {
+                            setEditingShipment(shipment);
+                            setEditCourier(shipment.courier || '');
+                            setEditCustomCourier('');
+                            setEditTrackingNumber(shipment.tracking_number || '');
+                            setEditTrackingUrl(shipment.tracking_url || '');
+                            setEditSupplierOrderId(shipment.supplier_order_id || '');
+                            setEditNotes(shipment.notes || '');
+                          }}
+                          updating={updating}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Supplier Fulfillment (legacy) */}
+                {fulfillments.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-slate-500 mb-2">Supplier Fulfillment (Legacy)</h3>
                     <div className="space-y-3">
                       {fulfillments.map((f) => (
                         <div key={f.id} className="rounded-lg border bg-slate-50 p-4">
@@ -467,49 +544,174 @@ export default function OrdersPage() {
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
-
-                {/* Tracking & Shipping */}
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-4">
-                  <h3 className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                    <Truck className="h-4 w-4" /> Shipping & Tracking
-                  </h3>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <Label>Courier</Label>
-                      <Select value={trackingCourier} onValueChange={setTrackingCourier}>
-                        <SelectTrigger><SelectValue placeholder="Select courier" /></SelectTrigger>
-                        <SelectContent>
-                          {COURIERS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {trackingCourier === '_own courier_' && (
-                      <div>
-                        <Label>Courier Name</Label>
-                        <Input value={customCourier} onChange={(e) => setCustomCourier(e.target.value)} placeholder="Enter courier name" />
-                      </div>
-                    )}
                   </div>
-                  <div>
-                    <Label>Tracking Number</Label>
-                    <Input value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="Enter tracking number" />
-                  </div>
-                  <div>
-                    <Label>Tracking URL</Label>
-                    <Input type="url" value={trackingUrl} onChange={(e) => setTrackingUrl(e.target.value)} placeholder="https://..." />
-                  </div>
-                  <Button size="sm" onClick={saveTrackingInfo} disabled={savingTracking} className="gap-1">
-                    {savingTracking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                    Save Tracking Info
-                  </Button>
-                </div>
+                )}
               </div>
             </>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Shipment Dialog */}
+      <Dialog open={!!editingShipment} onOpenChange={() => setEditingShipment(null)}>
+        <DialogContent className="max-w-lg">
+          {editingShipment && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Edit Shipment #{editingShipment.order_number}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-slate-700">Status:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {SHIPMENT_STATUSES.map((s) => (
+                      <Button
+                        key={s.value}
+                        size="sm"
+                        variant={editingShipment.status === s.value ? 'default' : 'outline'}
+                        onClick={() => handleShipmentStatusChange(editingShipment.id, s.value)}
+                        disabled={updating}
+                      >
+                        {s.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label>Courier</Label>
+                  <Select value={editCourier} onValueChange={setEditCourier}>
+                    <SelectTrigger><SelectValue placeholder="Select courier" /></SelectTrigger>
+                    <SelectContent>
+                      {COURIERS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {editCourier === '_own courier_' && (
+                  <div>
+                    <Label>Courier Name</Label>
+                    <Input value={editCustomCourier} onChange={(e) => setEditCustomCourier(e.target.value)} placeholder="Enter courier name" />
+                  </div>
+                )}
+                <div>
+                  <Label>Tracking Number</Label>
+                  <Input value={editTrackingNumber} onChange={(e) => setEditTrackingNumber(e.target.value)} placeholder="Enter tracking number" />
+                </div>
+                <div>
+                  <Label>Tracking URL</Label>
+                  <Input type="url" value={editTrackingUrl} onChange={(e) => setEditTrackingUrl(e.target.value)} placeholder="https://..." />
+                </div>
+                <div>
+                  <Label>Supplier Order ID</Label>
+                  <Input value={editSupplierOrderId} onChange={(e) => setEditSupplierOrderId(e.target.value)} placeholder="e.g. ZM-12345" />
+                </div>
+                <div>
+                  <Label>Notes</Label>
+                  <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Internal notes..." />
+                </div>
+                <Button onClick={saveShipmentTracking} disabled={savingShipment} className="gap-1">
+                  {savingShipment ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Save Shipment
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function ShipmentCard({
+  shipment,
+  index,
+  onStatusChange,
+  onEdit,
+  updating,
+}: {
+  shipment: ShipmentWithItems;
+  index: number;
+  onStatusChange: (id: string, status: ShipmentStatus) => void;
+  onEdit: () => void;
+  updating: boolean;
+}) {
+  const items = shipment.shipment_items || [];
+  const hasTracking = !!shipment.tracking_number;
+
+  return (
+    <div className="rounded-lg border bg-slate-50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Box className="h-4 w-4 text-slate-500" />
+          <span className="font-medium text-slate-900">Shipment #{index}</span>
+          {getShipmentBadge(shipment.status)}
+          {shipment.supplier_name && (
+            <span className="text-sm text-slate-500">{shipment.supplier_name}</span>
+          )}
+        </div>
+        <Button size="sm" variant="outline" onClick={onEdit}>
+          Edit
+        </Button>
+      </div>
+
+      {/* Items */}
+      {items.length > 0 && (
+        <div className="mt-3 space-y-1">
+          <p className="text-xs font-medium text-slate-500">Products:</p>
+          {items.map((si) => {
+            const item = si.order_item;
+            if (!item) return null;
+            return (
+              <div key={si.id} className="flex items-center gap-2 text-sm text-slate-700">
+                <span className="truncate">{item.product_name}</span>
+                {item.selected_options && (
+                  <span className="text-xs text-slate-400">
+                    ({Object.values(item.selected_options).map((v) => v.name).join(', ')})
+                  </span>
+                )}
+                <span className="text-xs text-slate-400">× {si.quantity}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Tracking */}
+      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+        <div>
+          <span className="text-slate-500">Courier:</span>{' '}
+          <span className={shipment.courier ? 'font-medium' : 'text-slate-400'}>
+            {shipment.courier || 'Not assigned'}
+          </span>
+        </div>
+        <div>
+          <span className="text-slate-500">Tracking:</span>{' '}
+          <span className={hasTracking ? 'font-mono font-medium' : 'text-slate-400'}>
+            {shipment.tracking_number || 'Pending'}
+          </span>
+        </div>
+        {shipment.supplier_order_id && (
+          <div className="col-span-2">
+            <span className="text-slate-500">Supplier Order ID:</span>{' '}
+            <span className="font-medium">{shipment.supplier_order_id}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Quick status buttons */}
+      <div className="mt-3 flex flex-wrap gap-1">
+        {SHIPMENT_STATUSES.filter((s) => s.value !== shipment.status).map((s) => (
+          <Button
+            key={s.value}
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            disabled={updating}
+            onClick={() => onStatusChange(shipment.id, s.value)}
+          >
+            → {s.label}
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }

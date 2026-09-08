@@ -98,3 +98,11 @@ export const PAYFAST_VALIDATE_URL = PAYFAST_SANDBOX
 
 export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
 export const WHATSAPP_DEFAULT_MESSAGE = 'Hello Everything Store, I need help with a product.';
+
+export const SHIPMENT_STATUSES = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'shipped', label: 'Shipped' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'cancelled', label: 'Cancelled' },
+] as const;
