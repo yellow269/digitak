@@ -14,7 +14,7 @@ import { SOUTH_AFRICAN_PROVINCES } from '@/lib/constants';
 import type { CheckoutFormData } from '@/lib/types';
 
 export default function CheckoutPage() {
-  const { cart, clearCart, itemCount } = useCart();
+  const { cart, clearCart, itemCount, province, setProvince } = useCart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState<CheckoutFormData>({
@@ -30,6 +30,10 @@ export default function CheckoutPage() {
 
   function update<K extends keyof CheckoutFormData>(key: K, value: CheckoutFormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    // Sync province with cart for shipping recalculation
+    if (key === 'province') {
+      setProvince(value || null);
+    }
   }
 
   if (cart.items.length === 0) {
@@ -260,7 +264,13 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Shipping</span>
-                    <span>{formatPrice(cart.shipping, 'ZAR')}</span>
+                    <span>
+                      {cart.shipping === 0 ? (
+                        <span className="text-green-600 font-medium">Free</span>
+                      ) : (
+                        formatPrice(cart.shipping, 'ZAR')
+                      )}
+                    </span>
                   </div>
                   <div className="flex justify-between border-t pt-2">
                     <span className="font-semibold">Total</span>

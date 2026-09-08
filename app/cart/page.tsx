@@ -1,14 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Trash2, Plus, Minus, ShoppingBag, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCart, cartItemKey, formatOptionsLabel } from '@/hooks/use-cart';
 import { formatPrice } from '@/lib/format';
+import { SOUTH_AFRICAN_PROVINCES } from '@/lib/constants';
 
 export default function CartPage() {
-  const { cart, removeItem, updateQuantity, itemCount } = useCart();
+  const { cart, removeItem, updateQuantity, itemCount, shippingConfig, province, setProvince } = useCart();
 
   if (cart.items.length === 0) {
     return (
@@ -24,6 +26,8 @@ export default function CartPage() {
       </div>
     );
   }
+
+  const showProvinceSelector = shippingConfig.mode === 'per_province';
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
@@ -117,14 +121,45 @@ export default function CartPage() {
               <CardTitle>Order Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Province selector for per-province shipping */}
+              {showProvinceSelector && (
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">
+                    <Truck className="inline h-3 w-3 mr-1" />
+                    Shipping province
+                  </label>
+                  <Select value={province || ''} onValueChange={(v) => setProvince(v || null)}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Select province" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SOUTH_AFRICAN_PROVINCES.map((p) => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Subtotal ({itemCount} items)</span>
                 <span className="font-medium">{formatPrice(cart.subtotal, 'ZAR')}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Shipping</span>
-                <span className="font-medium">{formatPrice(cart.shipping, 'ZAR')}</span>
+                <span className="font-medium">
+                  {cart.shipping === 0 ? (
+                    <span className="text-green-600">Free</span>
+                  ) : (
+                    formatPrice(cart.shipping, 'ZAR')
+                  )}
+                </span>
               </div>
+              {shippingConfig.free_shipping_minimum > 0 && cart.shipping > 0 && (
+                <p className="text-xs text-slate-400">
+                  Free shipping on orders over {formatPrice(shippingConfig.free_shipping_minimum, 'ZAR')}
+                </p>
+              )}
               <div className="flex justify-between border-t pt-4">
                 <span className="font-semibold text-slate-900">Total</span>
                 <span className="text-xl font-bold">{formatPrice(cart.total, 'ZAR')}</span>

@@ -2,24 +2,51 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { CartItem, Cart, SelectedOptions } from '@/lib/types';
+import type { ShippingConfig } from '@/lib/shipping';
+import { calculateShippingClient } from '@/lib/shipping';
 
 const CART_KEY = 'everything-store-cart';
+const SHIPPING_CONFIG_KEY = 'everything-store-shipping-config';
+const SHIPPING_PROVINCE_KEY = 'everything-store-shipping-province';
 
-function calculateCart(items: CartItem[]): Cart {
+const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
+  mode: 'flat_rate',
+  flat_rate: 0,
+  free_shipping_minimum: 0,
+  supplier_rates: {},
+  province_rates: {},
+  exclude_free_shipping_products: false,
+};
+
+function calculateCart(items: CartItem[], config?: ShippingConfig, province?: string | null): Cart {
   const subtotal = items.reduce((sum, item) => {
     const price = item.sale_price && item.sale_price < item.price ? item.sale_price : item.price;
     return sum + price * item.quantity;
   }, 0);
 
+  const roundedSubtotal = Math.round(subtotal * 100) / 100;
+
+  // Use shipping calculator if config is available
+  if (config) {
+    const result = calculateShippingClient(items, province || null, roundedSubtotal, config);
+    return {
+      items,
+      subtotal: roundedSubtotal,
+      shipping: Math.round(result.shipping * 100) / 100,
+      total: Math.round((roundedSubtotal + result.shipping) * 100) / 100,
+    };
+  }
+
+  // Fallback: use product-level supplier_shipping_cost
   const shipping = items.reduce((sum, item) => {
     return sum + (item.supplier_shipping_cost || 0) * item.quantity;
   }, 0);
 
   return {
     items,
-    subtotal: Math.round(subtotal * 100) / 100,
+    subtotal: roundedSubtotal,
     shipping: Math.round(shipping * 100) / 100,
-    total: Math.round((subtotal + shipping) * 100) / 100,
+    total: Math.round((roundedSubtotal + shipping) * 100) / 100,
   };
 }
 
@@ -35,6 +62,43 @@ function loadCart(): CartItem[] {
     // Ignore invalid data
   }
   return [];
+}
+
+function loadShippingConfig(): ShippingConfig | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem(SHIPPING_CONFIG_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed.mode === 'string') return parsed;
+    }
+  } catch {
+    // Ignore invalid data
+  }
+  return null;
+}
+
+function saveShippingConfig(config: ShippingConfig) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SHIPPING_CONFIG_KEY, JSON.stringify(config));
+  } catch {
+    // Storage full or unavailable
+  }
+}
+
+function loadProvince(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(SHIPPING_PROVINCE_KEY);
+}
+
+function saveProvince(province: string | null) {
+  if (typeof window === 'undefined') return;
+  if (province) {
+    localStorage.setItem(SHIPPING_PROVINCE_KEY, province);
+  } else {
+    localStorage.removeItem(SHIPPING_PROVINCE_KEY);
+  }
 }
 
 function saveCart(items: CartItem[]) {
@@ -53,6 +117,9 @@ type CartContextType = {
   updateQuantity: (itemKey: string, quantity: number) => void;
   clearCart: () => void;
   itemCount: number;
+  shippingConfig: ShippingConfig;
+  province: string | null;
+  setProvince: (province: string | null) => void;
 };
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -83,15 +150,38 @@ export function formatOptionsLabel(options: SelectedOptions | null | undefined):
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [shippingConfig, setShippingConfig] = useState<ShippingConfig>(DEFAULT_SHIPPING_CONFIG);
+  const [province, setProvinceState] = useState<string | null>(null);
 
+  // Load cart + config on mount
   useEffect(() => {
     setItems(loadCart());
+    const savedConfig = loadShippingConfig();
+    if (savedConfig) setShippingConfig(savedConfig);
+    setProvinceState(loadProvince());
     setMounted(true);
+
+    // Fetch fresh config from API
+    fetch('/api/shipping-config')
+      .then((r) => r.json())
+      .then((config: ShippingConfig) => {
+        setShippingConfig(config);
+        saveShippingConfig(config);
+      })
+      .catch(() => {
+        // Use cached or default config
+      });
   }, []);
 
+  // Persist cart
   useEffect(() => {
     if (mounted) saveCart(items);
   }, [items, mounted]);
+
+  const setProvince = useCallback((p: string | null) => {
+    setProvinceState(p);
+    saveProvince(p);
+  }, []);
 
   const addItem = useCallback((item: Omit<CartItem, 'quantity'> & { quantity?: number }) => {
     const qty = item.quantity || 1;
@@ -126,11 +216,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems([]);
   }, []);
 
-  const cart = calculateCart(items);
+  const cart = calculateCart(items, shippingConfig, province);
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ cart, addItem, removeItem, updateQuantity, clearCart, itemCount }}>
+    <CartContext.Provider value={{ cart, addItem, removeItem, updateQuantity, clearCart, itemCount, shippingConfig, province, setProvince }}>
       {children}
     </CartContext.Provider>
   );
@@ -146,6 +236,9 @@ export function useCart() {
       updateQuantity: () => {},
       clearCart: () => {},
       itemCount: 0,
+      shippingConfig: DEFAULT_SHIPPING_CONFIG,
+      province: null,
+      setProvince: () => {},
     };
   }
   return context;

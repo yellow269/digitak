@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import { PAYFAST_MERCHANT_ID, PAYFAST_MERCHANT_KEY, PAYFAST_PASSPHRASE, PAYFAST_URL, SITE_URL } from '@/lib/constants';
+import { calculateShipping } from '@/lib/shipping';
+import { loadShippingConfig } from '@/lib/shipping-config';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -120,7 +122,6 @@ export async function POST(req: NextRequest) {
 
     // Look up product details and calculate server-side totals
     let serverSubtotal = 0;
-    let serverShipping = 0;
     const orderItems: {
       product_id: string;
       product_name: string;
@@ -137,6 +138,9 @@ export async function POST(req: NextRequest) {
       selected_options: Record<string, { name: string; hex?: string }> | null;
       variant_sku: string | null;
     }[] = [];
+
+    // Cart items for shipping calculation
+    const cartItemsForShipping: { productId: string; supplier_shipping_cost?: number; quantity: number }[] = [];
 
     for (const item of items) {
       const { data: product, error: productErr } = await supabase
@@ -167,7 +171,6 @@ export async function POST(req: NextRequest) {
       }
 
       // Fallback: use the client-sent price if DB resolution produced 0
-      // The cart already resolved the correct price from the same database
       if (unitPrice <= 0) {
         const clientPrice = Number(item.price);
         if (clientPrice > 0 && Number.isFinite(clientPrice)) {
@@ -179,10 +182,13 @@ export async function POST(req: NextRequest) {
       console.log('[Checkout] Product:', item.productId, '| db: price=', dbPrice, 'sale_price=', dbSalePrice, 'selling_price=', dbSellingPrice, '| resolved:', unitPrice);
 
       const itemTotal = unitPrice * item.quantity;
-      const itemShipping = (product.supplier_shipping_cost || 0) * item.quantity;
-
       serverSubtotal += itemTotal;
-      serverShipping += itemShipping;
+
+      cartItemsForShipping.push({
+        productId: product.id,
+        supplier_shipping_cost: product.supplier_shipping_cost || 0,
+        quantity: item.quantity,
+      });
 
       orderItems.push({
         product_id: product.id,
@@ -201,6 +207,16 @@ export async function POST(req: NextRequest) {
         variant_sku: item.variant_sku || null,
       });
     }
+
+    // Calculate shipping using the shipping calculator
+    const shippingConfig = await loadShippingConfig();
+    const shippingResult = calculateShipping(
+      cartItemsForShipping as never,
+      customer.province || null,
+      serverSubtotal,
+      shippingConfig
+    );
+    const serverShipping = shippingResult.shipping;
 
     let serverTotal = Number(serverSubtotal) + Number(serverShipping);
 
