@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -190,6 +191,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
+      revalidatePath('/products');
+      revalidatePath('/admin/products');
+
       return NextResponse.json({
         published: inStockIds.length,
         skipped: skippedCount,
@@ -208,6 +212,9 @@ export async function POST(req: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    revalidatePath('/products');
+    revalidatePath('/admin/products');
 
     return NextResponse.json({
       unpublished: productIds.length,

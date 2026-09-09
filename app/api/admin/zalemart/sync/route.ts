@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import {
   ZALEMART_FEED_URL,
@@ -400,6 +401,10 @@ export async function POST(req: NextRequest) {
     } catch (cleanupErr) {
       console.warn('[ZalemartSync] Cleanup pass failed:', cleanupErr);
     }
+
+    // Revalidate product pages after sync
+    revalidatePath('/products');
+    revalidatePath('/admin/products');
 
     return NextResponse.json(result);
   } catch (err) {

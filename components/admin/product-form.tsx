@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
 import { slugify, formatPrice } from '@/lib/format';
 import { PRODUCT_TYPES, STOCK_STATUSES } from '@/lib/constants';
+import { saveProduct, deleteProduct } from '@/lib/actions/products';
 import type { Category, Supplier, ProductType, StockStatus, ColourOption, ProductOption, ProductOptionValue } from '@/lib/types';
 import { CategorySelect } from '@/components/admin/category-select';
 
@@ -260,13 +261,13 @@ export function ProductForm({
 
     let result;
     if (productId) {
-      result = await supabase.from('products').update(payload).eq('id', productId);
+      result = await saveProduct(productId, payload, slugify(form.slug));
     } else {
-      result = await supabase.from('products').insert(payload);
+      result = await saveProduct(null, payload, slugify(form.slug));
     }
 
     if (result.error) {
-      setError(result.error.message);
+      setError(result.error);
       setLoading(false);
       return;
     }
@@ -279,10 +280,9 @@ export function ProductForm({
     if (!productId) return;
     if (!confirm('Are you sure you want to delete this product? This cannot be undone.')) return;
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.from('products').delete().eq('id', productId);
-    if (error) {
-      setError(error.message);
+    const result = await deleteProduct(productId, form.slug || '');
+    if (result.error) {
+      setError(result.error);
       setLoading(false);
       return;
     }

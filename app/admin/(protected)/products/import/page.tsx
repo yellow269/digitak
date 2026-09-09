@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { createClient } from '@/lib/supabase/client';
 import { slugify, formatPrice } from '@/lib/format';
+import { importProduct } from '@/lib/actions/products';
 import { PRODUCT_TYPES, STOCK_STATUSES } from '@/lib/constants';
 import type { Category, Supplier, ProductType, StockStatus, ProductOption, ProductOptionValue } from '@/lib/types';
 import type { ImportedProduct } from '@/app/api/import-product/route';
@@ -329,9 +330,9 @@ export default function ImportProductPage() {
       options: form.options.length > 0 ? form.options : [],
     };
 
-    const { error } = await supabase.from('products').insert(payload);
-    if (error) {
-      setSaveError(error.message);
+    const result = await importProduct(payload, slugify(form.name));
+    if (result.error) {
+      setSaveError(result.error);
       setSaving(false);
       return;
     }
