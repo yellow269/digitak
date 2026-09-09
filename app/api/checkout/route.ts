@@ -139,8 +139,18 @@ export async function POST(req: NextRequest) {
       variant_sku: string | null;
     }[] = [];
 
-    // Cart items for shipping calculation
-    const cartItemsForShipping: { productId: string; supplier_shipping_cost?: number; quantity: number }[] = [];
+    // Cart items for shipping calculation — build full CartItem-compatible objects
+    const cartItemsForShipping: {
+      productId: string;
+      name: string;
+      slug: string;
+      image_url: string | null;
+      price: number;
+      sale_price?: number | null;
+      quantity: number;
+      product_type: string;
+      supplier_shipping_cost?: number;
+    }[] = [];
 
     for (const item of items) {
       const { data: product, error: productErr } = await supabase
@@ -186,8 +196,13 @@ export async function POST(req: NextRequest) {
 
       cartItemsForShipping.push({
         productId: product.id,
-        supplier_shipping_cost: product.supplier_shipping_cost || 0,
+        name: product.name,
+        slug: product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        image_url: product.image_url,
+        price: unitPrice,
         quantity: item.quantity,
+        product_type: product.product_type || 'general',
+        supplier_shipping_cost: product.supplier_shipping_cost || 0,
       });
 
       orderItems.push({

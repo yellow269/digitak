@@ -19,9 +19,9 @@ CREATE POLICY "Service role can manage site_settings"
   USING (true)
   WITH CHECK (true);
 
--- Seed default shipping config
+-- Seed default shipping config (per_product mode uses each product's supplier_shipping_cost)
 INSERT INTO site_settings (key, value, description) VALUES
-  ('shipping', '{"mode":"flat_rate","flat_rate":0,"free_shipping_minimum":0,"supplier_rates":{},"province_rates":{},"exclude_free_shipping_products":false}'::jsonb, 'Shipping configuration')
+  ('shipping', '{"mode":"per_product","flat_rate":0,"free_shipping_minimum":0,"province_rates":{}}'::jsonb, 'Shipping configuration')
 ON CONFLICT (key) DO NOTHING;
 
 DROP TRIGGER IF EXISTS site_settings_updated_at ON site_settings;

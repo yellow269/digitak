@@ -28,6 +28,7 @@ export default function CartPage() {
   }
 
   const showProvinceSelector = shippingConfig.mode === 'per_province';
+  const isPerProduct = shippingConfig.mode === 'per_product';
 
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
@@ -40,6 +41,7 @@ export default function CartPage() {
             const price = item.sale_price && item.sale_price < item.price ? item.sale_price : item.price;
             const lineTotal = price * item.quantity;
             const key = cartItemKey(item);
+            const itemShipping = (item.supplier_shipping_cost || 0) * item.quantity;
 
             return (
               <Card key={key}>
@@ -77,6 +79,13 @@ export default function CartPage() {
                         )}
                         {item.shipping_estimate && (
                           <p className="text-xs text-slate-500 mt-0.5">{item.shipping_estimate}</p>
+                        )}
+                        {isPerProduct && itemShipping > 0 && (
+                          <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                            <Truck className="h-3 w-3" />
+                            Shipping: {formatPrice(itemShipping, 'ZAR')}
+                            {item.quantity > 1 && ` (${formatPrice(item.supplier_shipping_cost || 0, 'ZAR')} × ${item.quantity})`}
+                          </p>
                         )}
                       </div>
                       <Button
@@ -145,6 +154,24 @@ export default function CartPage() {
                 <span className="text-slate-500">Subtotal ({itemCount} items)</span>
                 <span className="font-medium">{formatPrice(cart.subtotal, 'ZAR')}</span>
               </div>
+
+              {/* Shipping breakdown per item */}
+              {isPerProduct && cart.items.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-slate-500">Shipping</span>
+                  {cart.items.map((item) => {
+                    const itemShipping = (item.supplier_shipping_cost || 0) * item.quantity;
+                    if (itemShipping === 0) return null;
+                    return (
+                      <div key={cartItemKey(item)} className="flex justify-between text-xs text-slate-500 pl-2">
+                        <span className="truncate">{item.name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}</span>
+                        <span className="shrink-0 ml-2">{formatPrice(itemShipping, 'ZAR')}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Shipping</span>
                 <span className="font-medium">
@@ -155,6 +182,7 @@ export default function CartPage() {
                   )}
                 </span>
               </div>
+
               {shippingConfig.free_shipping_minimum > 0 && cart.shipping > 0 && (
                 <p className="text-xs text-slate-400">
                   Free shipping on orders over {formatPrice(shippingConfig.free_shipping_minimum, 'ZAR')}

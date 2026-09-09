@@ -2,25 +2,21 @@
  * Shipping calculator — pure calculation logic (no server imports).
  *
  * Supports three modes:
- * 1. flat_rate — single shipping fee for all orders
- * 2. per_supplier — each supplier has its own shipping rate
+ * 1. per_product — each product's supplier_shipping_cost is used (DEFAULT, dropshipping)
+ * 2. flat_rate — single shipping fee for all orders
  * 3. per_province — different rates per South African province
  */
 
 import type { CartItem } from '@/lib/types';
 
 export type ShippingConfig = {
-  mode: 'flat_rate' | 'per_supplier' | 'per_province';
-  /** Flat rate applied to every order (ZAR) */
+  mode: 'per_product' | 'flat_rate' | 'per_province';
+  /** Flat rate applied to every order (ZAR) — used by flat_rate mode */
   flat_rate: number;
   /** Minimum order subtotal for free shipping (0 = disabled) */
   free_shipping_minimum: number;
-  /** Per-supplier rates: { [supplierId]: rate } */
-  supplier_rates: Record<string, number>;
   /** Per-province rates: { [province]: rate } */
   province_rates: Record<string, number>;
-  /** If true, products with supplier_shipping_cost = 0 get free shipping */
-  exclude_free_shipping_products: boolean;
 };
 
 export type ShippingResult = {
@@ -30,12 +26,10 @@ export type ShippingResult = {
 };
 
 export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
-  mode: 'flat_rate',
+  mode: 'per_product',
   flat_rate: 0,
   free_shipping_minimum: 0,
-  supplier_rates: {},
   province_rates: {},
-  exclude_free_shipping_products: false,
 };
 
 /**
@@ -64,37 +58,33 @@ export function calculateShipping(
   }
 
   switch (config.mode) {
+    case 'per_product': {
+      // Each product's supplier_shipping_cost × quantity
+      let totalShipping = 0;
+      for (const item of items) {
+        const rate = item.supplier_shipping_cost || 0;
+        const itemShipping = rate * item.quantity;
+        totalShipping += itemShipping;
+        if (itemShipping > 0) {
+          breakdown.push({ label: `${item.name} shipping`, amount: itemShipping });
+        }
+      }
+      if (totalShipping === 0) {
+        breakdown.push({ label: 'No shipping charges', amount: 0 });
+      }
+      return {
+        shipping: totalShipping,
+        method: 'Per-product shipping',
+        breakdown,
+      };
+    }
+
     case 'flat_rate': {
       const rate = config.flat_rate || 0;
       return {
         shipping: rate,
         method: 'Flat rate',
         breakdown: [{ label: 'Flat rate shipping', amount: rate }],
-      };
-    }
-
-    case 'per_supplier': {
-      const supplierTotals = new Map<string, { rate: number; count: number }>();
-
-      for (const item of items) {
-        const sid = item.productId.split('-')[0];
-        const existing = supplierTotals.get(sid) || { rate: 0, count: 0 };
-        const itemRate = config.supplier_rates[sid] ?? (item.supplier_shipping_cost || 0);
-        existing.rate = itemRate;
-        existing.count += item.quantity;
-        supplierTotals.set(sid, existing);
-      }
-
-      let totalShipping = 0;
-      for (const [sid, data] of supplierTotals) {
-        totalShipping += data.rate;
-        breakdown.push({ label: `Shipping (${sid})`, amount: data.rate });
-      }
-
-      return {
-        shipping: totalShipping,
-        method: 'Per-supplier',
-        breakdown,
       };
     }
 
@@ -107,27 +97,38 @@ export function calculateShipping(
           breakdown: [{ label: `Shipping to ${province}`, amount: rate }],
         };
       }
-      const fallbackRate = config.flat_rate || 0;
+      // Fallback: if no province rate set, use per_product for each item
+      let totalShipping = 0;
+      for (const item of items) {
+        const rate = item.supplier_shipping_cost || 0;
+        const itemShipping = rate * item.quantity;
+        totalShipping += itemShipping;
+        if (itemShipping > 0) {
+          breakdown.push({ label: `${item.name} shipping`, amount: itemShipping });
+        }
+      }
+      if (totalShipping === 0) {
+        breakdown.push({ label: 'No shipping charges', amount: 0 });
+      }
       return {
-        shipping: fallbackRate,
-        method: 'Standard shipping',
-        breakdown: [{ label: 'Standard shipping', amount: fallbackRate }],
+        shipping: totalShipping,
+        method: 'Product-based shipping',
+        breakdown,
       };
     }
 
     default: {
+      // Unknown mode — fall back to per_product
       let totalShipping = 0;
       for (const item of items) {
-        const itemShipping = (item.supplier_shipping_cost || 0) * item.quantity;
-        if (itemShipping > 0) {
-          totalShipping += itemShipping;
-          breakdown.push({ label: `${item.name} shipping`, amount: itemShipping });
-        }
+        const rate = item.supplier_shipping_cost || 0;
+        const itemShipping = rate * item.quantity;
+        totalShipping += itemShipping;
       }
       return {
         shipping: totalShipping,
-        method: 'Product-based',
-        breakdown,
+        method: 'Product-based shipping',
+        breakdown: [{ label: 'Shipping', amount: totalShipping }],
       };
     }
   }

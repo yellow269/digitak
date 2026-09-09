@@ -10,12 +10,10 @@ const SHIPPING_CONFIG_KEY = 'everything-store-shipping-config';
 const SHIPPING_PROVINCE_KEY = 'everything-store-shipping-province';
 
 const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
-  mode: 'flat_rate',
+  mode: 'per_product',
   flat_rate: 0,
   free_shipping_minimum: 0,
-  supplier_rates: {},
   province_rates: {},
-  exclude_free_shipping_products: false,
 };
 
 function calculateCart(items: CartItem[], config?: ShippingConfig, province?: string | null): Cart {

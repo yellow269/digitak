@@ -12,12 +12,10 @@ import { SOUTH_AFRICAN_PROVINCES } from '@/lib/constants';
 import type { ShippingConfig } from '@/lib/shipping';
 
 const DEFAULT_CONFIG: ShippingConfig = {
-  mode: 'flat_rate',
+  mode: 'per_product',
   flat_rate: 0,
   free_shipping_minimum: 0,
-  supplier_rates: {},
   province_rates: {},
-  exclude_free_shipping_products: false,
 };
 
 export default function SettingsPage() {
@@ -162,17 +160,26 @@ export default function SettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="per_product">Per Product (each product has its own shipping cost)</SelectItem>
                     <SelectItem value="flat_rate">Flat Rate (same fee for all orders)</SelectItem>
                     <SelectItem value="per_province">Per Province (different rates by province)</SelectItem>
-                    <SelectItem value="per_supplier">Per Supplier (rates set on each product)</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="mt-1 text-xs text-slate-400">
+                  {shipping.mode === 'per_product' && 'Each product uses its supplier_shipping_cost field. Shipping is shown per item in the cart.'}
                   {shipping.mode === 'flat_rate' && 'A single shipping fee applies to all orders.'}
                   {shipping.mode === 'per_province' && 'Set different shipping rates for each province below.'}
-                  {shipping.mode === 'per_supplier' && 'Shipping is calculated from each product\'s supplier_shipping_cost field.'}
                 </p>
               </div>
+
+              {/* Per Product info */}
+              {shipping.mode === 'per_product' && (
+                <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+                  <p>Shipping rates are set per product via the <strong>supplier_shipping_cost</strong> field.</p>
+                  <p className="mt-1">Edit each product in Admin → Products to set its shipping cost.</p>
+                  <p className="mt-1 text-slate-400">Products with supplier_shipping_cost = 0 show as &quot;Free shipping&quot;.</p>
+                </div>
+              )}
 
               {/* Flat Rate */}
               {shipping.mode === 'flat_rate' && (
@@ -255,14 +262,6 @@ export default function SettingsPage() {
                       />
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* Per Supplier info */}
-              {shipping.mode === 'per_supplier' && (
-                <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-                  <p>Shipping rates are set per product via the <strong>supplier_shipping_cost</strong> field on each product.</p>
-                  <p className="mt-1">Edit each product in Admin → Products to set its shipping cost.</p>
                 </div>
               )}
 
