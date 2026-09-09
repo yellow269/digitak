@@ -463,7 +463,7 @@ export function ProductForm({
                   <Input type="number" step="0.01" value={form.supplier_cost} onChange={(e) => update('supplier_cost', e.target.value)} />
                 </div>
                 <div>
-                  <Label>Shipping Cost (R)</Label>
+                  <Label>Supplier Shipping Cost (R)</Label>
                   <Input type="number" step="0.01" value={form.supplier_shipping_cost} onChange={(e) => update('supplier_shipping_cost', e.target.value)} />
                 </div>
                 <div>

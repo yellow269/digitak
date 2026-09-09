@@ -4,7 +4,7 @@
  * `estimated_profit`, and other admin-only fields.
  */
 export const PUBLIC_PRODUCT_COLUMNS =
-  'id, name, slug, short_description, description, benefits, category_id, vendor_name, image_url, price, sale_price, currency, rating, review_count, featured, status, product_type, stock_status, shipping_estimate, selling_price, colours, options, variant_stock, created_at, updated_at, category:categories(*)';
+  'id, name, slug, short_description, description, benefits, category_id, vendor_name, image_url, price, sale_price, currency, rating, review_count, featured, status, product_type, stock_status, shipping_estimate, selling_price, supplier_shipping_cost, colours, options, variant_stock, created_at, updated_at, category:categories(*)';
 
 /**
  * Column selection for admin product queries.

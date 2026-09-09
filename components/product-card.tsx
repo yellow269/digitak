@@ -29,6 +29,7 @@ export function ProductCard({ product }: { product: Product }) {
       sale_price: product.sale_price,
       product_type: product.product_type || 'affiliate',
       shipping_estimate: product.shipping_estimate,
+      supplier_shipping_cost: product.supplier_shipping_cost,
       stock_status: product.stock_status,
     });
     
