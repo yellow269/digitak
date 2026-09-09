@@ -16,6 +16,16 @@ export function ProductCard({ product }: { product: Product }) {
   const displayPrice = product.selling_price || product.price;
   const isOnSale = product.sale_price && product.sale_price < (product.price || 0);
 
+  // Debug: log on mount
+  console.log('[ProductCard] mounted:', {
+    id: product.id,
+    slug: product.slug,
+    name: product.name,
+    href: `/products/${product.slug}`,
+    stock_status: product.stock_status,
+    product_type: product.product_type,
+  });
+
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault();
     if (!displayPrice) return;
