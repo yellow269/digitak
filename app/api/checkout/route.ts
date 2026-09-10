@@ -166,18 +166,23 @@ export async function POST(req: NextRequest) {
       }
 
       // Resolve the best price from database fields
+      // Priority: sale_price < selling_price (authoritative for dropshipping) > price (fallback)
       const dbPrice = product.price != null ? Number(product.price) : null;
       const dbSalePrice = product.sale_price != null ? Number(product.sale_price) : null;
       const dbSellingPrice = product.selling_price != null ? Number(product.selling_price) : null;
 
-      // Try database price resolution first: sale_price > price > selling_price
+      // Base price: selling_price is authoritative (calculated from supplier_cost + shipping + markup)
+      // Fall back to price for non-dropshipping or legacy products
+      const basePrice = (dbSellingPrice != null && dbSellingPrice > 0)
+        ? dbSellingPrice
+        : (dbPrice != null && dbPrice > 0) ? dbPrice : 0;
+
+      // Check for valid sale price (must be less than the base price)
       let unitPrice = 0;
-      if (dbSalePrice != null && dbPrice != null && dbSalePrice > 0 && dbSalePrice < dbPrice) {
+      if (dbSalePrice != null && dbSalePrice > 0 && basePrice > 0 && dbSalePrice < basePrice) {
         unitPrice = dbSalePrice;
-      } else if (dbPrice != null && dbPrice > 0) {
-        unitPrice = dbPrice;
-      } else if (dbSellingPrice != null && dbSellingPrice > 0) {
-        unitPrice = dbSellingPrice;
+      } else {
+        unitPrice = basePrice;
       }
 
       // Fallback: use the client-sent price if DB resolution produced 0

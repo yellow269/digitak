@@ -51,7 +51,7 @@ export function AddToCartButton({
       name: product.name,
       slug: product.slug,
       image_url: product.image_url,
-      price: product.price || displayPrice || 0,
+      price: displayPrice || 0,
       sale_price: product.sale_price,
       product_type: product.product_type || 'affiliate',
       shipping_estimate: product.shipping_estimate,

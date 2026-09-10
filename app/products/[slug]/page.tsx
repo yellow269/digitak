@@ -79,7 +79,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   const isAffiliate = product.product_type === 'affiliate';
   const isDropshipping = product.product_type === 'dropshipping';
   const displayPrice = product.selling_price || product.price;
-  const isOnSale = product.sale_price && product.sale_price < (product.price || 0);
+  const isOnSale = product.sale_price && displayPrice && product.sale_price < displayPrice;
   const relatedProducts = await getRelatedProducts(product.category?.id || null, product.id);
 
   const jsonLd = {
@@ -193,9 +193,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <span className="text-3xl font-bold text-slate-900">
               {formatPrice(isOnSale ? (product.sale_price ?? null) : (displayPrice ?? null), product.currency || 'ZAR')}
             </span>
-            {isOnSale && product.price && (
+            {isOnSale && displayPrice && (
               <span className="text-lg text-slate-400 line-through">
-                {formatPrice(product.price, product.currency || 'ZAR')}
+                {formatPrice(displayPrice, product.currency || 'ZAR')}
               </span>
             )}
           </div>

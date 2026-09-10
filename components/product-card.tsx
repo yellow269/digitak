@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 export function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart();
   const displayPrice = product.selling_price || product.price;
-  const isOnSale = product.sale_price && product.sale_price < (product.price || 0);
+  const isOnSale = product.sale_price && displayPrice && product.sale_price < displayPrice;
 
   // Debug: log on mount
   console.log('[ProductCard] mounted:', {
@@ -35,7 +35,7 @@ export function ProductCard({ product }: { product: Product }) {
       name: product.name,
       slug: product.slug,
       image_url: product.image_url,
-      price: product.price || displayPrice || 0,
+      price: displayPrice || 0,
       sale_price: product.sale_price,
       product_type: product.product_type || 'affiliate',
       shipping_estimate: product.shipping_estimate,
@@ -110,7 +110,7 @@ export function ProductCard({ product }: { product: Product }) {
           <div>
             {isOnSale && (
               <span className="text-sm text-slate-400 line-through mr-2">
-                {formatPrice(product.price, product.currency || 'ZAR')}
+                {formatPrice(displayPrice, product.currency || 'ZAR')}
               </span>
             )}
             <span className="text-lg font-bold text-slate-900">
